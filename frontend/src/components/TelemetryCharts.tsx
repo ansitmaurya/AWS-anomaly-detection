@@ -85,9 +85,9 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
 
   return (
     <div style={{
-      background: '#ffffff',
+      background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
       borderRadius: '16px',
-      border: '1.5px solid #cbd5e1',
+      border: '1.5px solid rgba(34, 197, 94, 0.45)',
       padding: '1.6rem',
       boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
     }}>
@@ -244,8 +244,8 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
               position: 'absolute',
               top: '12px',
               left: '65px',
-              backgroundColor: '#ffffff',
-              border: '1.5px solid #cbd5e1',
+              background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+              border: '1.5px solid rgba(34, 197, 94, 0.45)',
               borderRadius: '10px',
               padding: '0.75rem 1rem',
               fontSize: '0.76rem',

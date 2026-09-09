@@ -14,7 +14,7 @@ import { TelemetryCharts } from './components/TelemetryCharts'
 import { SunIcon, RainIcon, CloudSunIcon, StormIcon } from './components/WeatherIcons'
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'map' | 'simulator' | 'explorer' | 'analytics' | 'stations'>('map')
+  const [activeTab, setActiveTab] = useState<'map' | 'simulator' | 'explorer' | 'analytics' | 'stations' | 'about' | 'future_scope'>('map')
   const [backendHealth, setBackendHealth] = useState<HealthResponse | null>(null)
   const [stats, setStats] = useState<DatasetStatsResponse | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetryAnalyticsResponse | null>(null)
@@ -75,6 +75,17 @@ export function App() {
   const [stationStateFilter, setStationStateFilter] = useState<string>('')
   const [stationStatusFilter, setStationStatusFilter] = useState<string>('')
   const [loadingStations, setLoadingStations] = useState<boolean>(false)
+
+  // Cinematic Intro Screen State
+  const [showCinematicIntro, setShowCinematicIntro] = useState<boolean>(true)
+  const [introFadeOut, setIntroFadeOut] = useState<boolean>(false)
+
+  const closeCinematicIntro = () => {
+    setIntroFadeOut(true)
+    setTimeout(() => {
+      setShowCinematicIntro(false)
+    }, 650)
+  }
 
   // Fetch Health, Stats, Map Nodes & Preview Data on Mount
   useEffect(() => {
@@ -411,6 +422,108 @@ export function App() {
 
   return (
     <div className="dashboard-root-wrapper">
+      {/* CINEMATIC VIEW INTRO OVERLAY */}
+      {showCinematicIntro && (
+        <div className={`cinematic-intro-root ${introFadeOut ? 'intro-exiting' : ''}`}>
+          <div className="intro-backdrop">
+            <div className="intro-vignette" />
+            <div className="intro-grid" />
+            <div className="intro-aurora-glow" />
+            <div className="intro-radar-container revealed">
+              <div className="intro-radar-ring ring-1" />
+              <div className="intro-radar-ring ring-2" />
+              <div className="intro-radar-ring ring-3" />
+              <div className="intro-radar-crosshair-h" />
+              <div className="intro-radar-crosshair-v" />
+              <div className="intro-radar-sweep-beam" />
+              <span className="intro-node node-nw" />
+              <span className="intro-node node-ne" />
+              <span className="intro-node node-sw" />
+              <span className="intro-node node-se" />
+              <span className="intro-node node-center" />
+            </div>
+            <div className="intro-particles">
+              <span className="intro-particle ip1" />
+              <span className="intro-particle ip2" />
+              <span className="intro-particle ip3" />
+              <span className="intro-particle ip4" />
+              <span className="intro-particle ip5" />
+              <span className="intro-particle ip6" />
+              <span className="intro-particle ip7" />
+              <span className="intro-particle ip8" />
+            </div>
+          </div>
+
+          <div className="intro-content-container">
+            {/* Meteorological System Monogram */}
+            <div style={{
+              width: '76px',
+              height: '76px',
+              borderRadius: '20px',
+              background: 'radial-gradient(circle at 35% 35%, #34d399 0%, #059669 45%, #064e3b 100%)',
+              border: '1.5px solid rgba(110, 231, 183, 0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 30px rgba(16, 185, 129, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.5)',
+              margin: '0 auto 1.35rem auto'
+            }}>
+              <SunIcon size={42} />
+            </div>
+
+            {/* Main Cinematic Title & Typography */}
+            <div className="intro-typography visible">
+              <h1 className="intro-main-title" style={{ textTransform: 'uppercase', letterSpacing: '-0.01em' }}>
+                AWS ANOMALY DETECTION SYSTEM
+              </h1>
+              <p className="intro-subtitle" style={{ color: '#6ee7b7', fontWeight: 600 }}>
+                Intelligent Monitoring of Automatic Weather Stations
+              </p>
+              <p style={{
+                fontSize: '0.94rem',
+                color: '#cbd5e1',
+                maxWidth: '640px',
+                lineHeight: 1.6,
+                margin: '0 auto 1.25rem auto',
+                fontWeight: 500
+              }}>
+                Analyze historical weather-station data and detect unusual observations using machine learning.
+              </p>
+            </div>
+
+            {/* Cinematic Feature Capabilities Matrix */}
+            <div className="intro-features-matrix">
+              <span className="intro-feature-pill">
+                <span>🛰️</span>
+                <span>406 Synoptic Ground Stations</span>
+              </span>
+              <span className="intro-feature-pill">
+                <span>🧠</span>
+                <span>Isolation Forest ML Surveillance</span>
+              </span>
+              <span className="intro-feature-pill">
+                <span>⚡</span>
+                <span>Real-Time Open-Meteo Feeds</span>
+              </span>
+            </div>
+
+            {/* Clear Primary Action Button */}
+            <div className="intro-action-wrapper visible">
+              <button
+                onClick={closeCinematicIntro}
+                className="intro-enter-btn"
+                title="Enter Monitoring System"
+              >
+                <span>ENTER MONITORING SYSTEM →</span>
+              </button>
+              <div className="intro-hint-text">
+                Click to access real-time AWS analytics & map
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CINEMATIC ATMOSPHERIC BACKDROP */}
       <div className="cinematic-backdrop" aria-hidden="true">
         <div className="cinematic-aurora-beam" />
@@ -540,6 +653,8 @@ export function App() {
               { id: 'explorer', label: 'Anomaly Explorer', icon: '🔍', badge: stats ? `${stats.anomaly_records.toLocaleString()}` : '19k' },
               { id: 'analytics', label: 'Telemetry Analytics', icon: '📊', badge: 'Series' },
               { id: 'stations', label: 'Station Health Network', icon: '📍', badge: '406' },
+              { id: 'about', label: 'About', icon: 'ℹ️', badge: 'Info' },
+              { id: 'future_scope', label: 'Future Scope', icon: '🚀', badge: 'Roadmap' },
             ].map((tab) => {
               const isActive = activeTab === tab.id
               return (
@@ -560,8 +675,9 @@ export function App() {
         </div>
 
         <div className="sidebar-footer">
-          <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.72rem', color: '#6ee7b7', fontFamily: 'var(--font-mono)', textAlign: 'center', opacity: 0.8 }}>
-            ● MET-OPS v2.4
+          <div className="sidebar-footer-pill">
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e', boxShadow: '0 0 8px #22c55e', display: 'inline-block', flexShrink: 0 }} />
+            <span className="sidebar-footer-text">MET-OPS v2.4</span>
           </div>
         </div>
       </aside>
@@ -620,8 +736,8 @@ export function App() {
                   
                   {/* Main Overview Box */}
                   <div style={{
-                    background: '#ffffff',
-                    border: '1.5px solid #cbd5e1',
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+                    border: '1.5px solid rgba(34, 197, 94, 0.45)',
                     borderRadius: '16px',
                     padding: '1.5rem',
                     boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
@@ -653,7 +769,7 @@ export function App() {
                       This system monitors Automatic Weather Stations and analyzes their weather observations using historical data and machine learning.
                     </p>
 
-                    <p style={{ fontSize: '0.84rem', color: '#64748b', lineHeight: 1.55, margin: 0 }}>
+                    <p style={{ fontSize: '0.84rem', color: '#475569', lineHeight: 1.55, margin: 0 }}>
                       It helps identify unusual weather-station readings by comparing them with normal historical patterns. Click any station or point on the map to stream live Open-Meteo external ground truth.
                     </p>
                   </div>
@@ -663,8 +779,8 @@ export function App() {
                     
                     {/* Card 1: Historical Data */}
                     <div style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                      border: '1.5px solid rgba(34, 197, 94, 0.35)',
                       borderRadius: '12px',
                       padding: '1rem',
                       display: 'flex',
@@ -685,8 +801,8 @@ export function App() {
 
                     {/* Card 2: ML Anomaly Detection */}
                     <div style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                      border: '1.5px solid rgba(34, 197, 94, 0.35)',
                       borderRadius: '12px',
                       padding: '1rem',
                       display: 'flex',
@@ -707,8 +823,8 @@ export function App() {
 
                     {/* Card 3: Station Monitoring */}
                     <div style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                      border: '1.5px solid rgba(34, 197, 94, 0.35)',
                       borderRadius: '12px',
                       padding: '1rem',
                       display: 'flex',
@@ -729,8 +845,8 @@ export function App() {
 
                     {/* Card 4: Weather Parameters */}
                     <div style={{
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
+                      background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                      border: '1.5px solid rgba(34, 197, 94, 0.35)',
                       borderRadius: '12px',
                       padding: '1rem',
                       display: 'flex',
@@ -753,8 +869,8 @@ export function App() {
 
                   {/* Bottom Quick Action / Info Bar */}
                   <div style={{
-                    background: '#ffffff',
-                    border: '1.5px solid #cbd5e1',
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                    border: '1.5px solid rgba(34, 197, 94, 0.35)',
                     borderRadius: '10px',
                     padding: '0.75rem 1rem',
                     display: 'flex',
@@ -814,67 +930,67 @@ export function App() {
 
               </div>
 
-              {/* EXTERNAL WEATHER REFERENCE & CROSS-TELEMETRY (BELOW MAP) */}
+              {/* EXTERNAL WEATHER REFERENCE & CROSS-TELEMETRY (BELOW MAP - WHITE + LIGHT GREEN) */}
               <div
                 id="map-external-weather-panel"
                 style={{
-                  background: 'rgba(12, 32, 22, 0.88)',
-                  border: '1px solid rgba(52, 211, 153, 0.35)',
+                  background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+                  border: '1.5px solid rgba(34, 197, 94, 0.45)',
                   borderRadius: '16px',
-                  padding: '1.35rem 1.6rem',
-                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-                  backdropFilter: 'blur(10px)',
+                  padding: '1.5rem 1.75rem',
+                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '1rem'
+                  gap: '1.15rem'
                 }}
               >
                 {/* Header Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1px solid rgba(52, 211, 153, 0.18)', paddingBottom: '0.85rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1.5px solid rgba(34, 197, 94, 0.25)', paddingBottom: '0.95rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
-                      width: '36px',
-                      height: '36px',
+                      width: '38px',
+                      height: '38px',
                       borderRadius: '10px',
-                      background: 'rgba(16, 185, 129, 0.18)',
-                      border: '1px solid rgba(52, 211, 153, 0.4)',
+                      background: '#dcfce7',
+                      border: '1px solid #86efac',
+                      color: '#15803d',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.2rem'
+                      fontSize: '1.25rem'
                     }}>
                       🌐
                     </div>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em', margin: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em', margin: 0 }}>
                           External Weather Reference
                         </h3>
                         <span style={{
-                          fontSize: '0.68rem',
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '5px',
-                          background: 'rgba(52, 211, 153, 0.15)',
-                          color: '#6ee7b7',
-                          border: '1px solid rgba(52, 211, 153, 0.35)',
-                          fontWeight: 700,
+                          fontSize: '0.7rem',
+                          padding: '0.18rem 0.55rem',
+                          borderRadius: '6px',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          border: '1px solid #86efac',
+                          fontWeight: 800,
                           fontFamily: 'var(--font-mono)'
                         }}>
                           OPEN-METEO LIVE STREAM
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                      <div style={{ fontSize: '0.82rem', color: '#334155', marginTop: '0.2rem' }}>
                         {selectedMapStation && (!selectedMapDistanceKm || selectedMapDistanceKm === 0) ? (
                           <span>
-                            📍 <strong>{selectedMapStation.station_name}</strong> ({selectedMapStation.district}, {selectedMapStation.state}) • Lat: {selectedMapStation.latitude}°N, Lon: {selectedMapStation.longitude}°E • Elev: {selectedMapStation.elevation}m
+                            📍 <strong style={{ color: '#0f172a' }}>{selectedMapStation.station_name}</strong> ({selectedMapStation.district}, {selectedMapStation.state}) • Lat: {selectedMapStation.latitude}°N, Lon: {selectedMapStation.longitude}°E • Elev: {selectedMapStation.elevation}m
                           </span>
                         ) : selectedMapStation && selectedMapDistanceKm && selectedMapDistanceKm > 0 ? (
                           <span>
-                            📍 Selected Point: <strong>{selectedMapCoord?.lat.toFixed(4)}°N, {selectedMapCoord?.lng.toFixed(4)}°E</strong> • Nearest Synoptic Station: <strong>{selectedMapStation.station_name}</strong> (~{selectedMapDistanceKm} km away)
+                            📍 Selected Point: <strong style={{ color: '#0f172a' }}>{selectedMapCoord?.lat.toFixed(4)}°N, {selectedMapCoord?.lng.toFixed(4)}°E</strong> • Nearest Synoptic Station: <strong style={{ color: '#0f172a' }}>{selectedMapStation.station_name}</strong> (~{selectedMapDistanceKm} km away)
                           </span>
                         ) : selectedMapCoord ? (
                           <span>
-                            📍 Selected Coordinate: <strong>{selectedMapCoord.lat.toFixed(4)}°N, {selectedMapCoord.lng.toFixed(4)}°E</strong>
+                            📍 Selected Coordinate: <strong style={{ color: '#0f172a' }}>{selectedMapCoord.lat.toFixed(4)}°N, {selectedMapCoord.lng.toFixed(4)}°E</strong>
                           </span>
                         ) : (
                           <span>Click anywhere on the map or select any station marker to fetch real-time ground truth weather.</span>
@@ -884,9 +1000,9 @@ export function App() {
                   </div>
 
                   {/* Actions & Timestamp */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
                     {mapExtWeather?.timestamp && (
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'var(--font-mono)' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#475569', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                         Obs Time: {String(mapExtWeather.timestamp).replace('T', ' ')} UTC
                       </span>
                     )}
@@ -895,17 +1011,18 @@ export function App() {
                         onClick={() => handleMapLocationSelect(selectedMapCoord.lat, selectedMapCoord.lng, selectedMapStation || undefined)}
                         disabled={loadingMapExtWeather}
                         style={{
-                          background: 'rgba(16, 185, 129, 0.15)',
-                          border: '1px solid rgba(52, 211, 153, 0.4)',
-                          color: '#a7f3d0',
-                          borderRadius: '6px',
-                          padding: '0.3rem 0.7rem',
-                          fontSize: '0.74rem',
+                          background: '#059669',
+                          border: '1px solid #047857',
+                          color: '#ffffff',
+                          borderRadius: '7px',
+                          padding: '0.35rem 0.85rem',
+                          fontSize: '0.76rem',
                           fontWeight: 700,
                           cursor: loadingMapExtWeather ? 'not-allowed' : 'pointer',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.35rem',
+                          gap: '0.4rem',
+                          boxShadow: '0 2px 6px rgba(5,150,105,0.3)',
                           transition: 'all 0.15s ease'
                         }}
                       >
@@ -917,93 +1034,106 @@ export function App() {
 
                 {/* Body Content */}
                 {loadingMapExtWeather ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6ee7b7', fontSize: '0.86rem', fontWeight: 600 }}>
+                  <div style={{
+                    padding: '2.5rem',
+                    textAlign: 'center',
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                    borderRadius: '12px',
+                    border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                    color: '#059669',
+                    fontSize: '0.9rem',
+                    fontWeight: 700
+                  }}>
                     ⏳ Fetching live meteorological observation from Open-Meteo for {selectedMapCoord?.name || 'target location'}...
                   </div>
                 ) : mapExtWeather && mapExtWeather.available ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
                     
-                    {/* 4 Metric Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
+                    {/* 4 Metric Cards in White + Light Green */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.95rem' }}>
                       
                       {/* Temperature */}
                       <div style={{
-                        background: 'rgba(10, 26, 18, 0.75)',
-                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                        border: '1.5px solid rgba(34, 197, 94, 0.35)',
                         borderRadius: '12px',
-                        padding: '0.85rem 1rem',
+                        padding: '0.95rem 1.15rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.2rem'
+                        gap: '0.25rem',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Temperature</span>
-                          <span style={{ fontSize: '1rem' }}>🌡️</span>
+                          <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Temperature</span>
+                          <span style={{ fontSize: '1.1rem' }}>🌡️</span>
                         </div>
-                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
                           {mapExtWeather.temperature != null ? `${mapExtWeather.temperature}°C` : 'N/A'}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#6ee7b7' }}>2-meter ambient air reading</div>
+                        <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>2-meter ambient air reading</div>
                       </div>
 
                       {/* Relative Humidity */}
                       <div style={{
-                        background: 'rgba(10, 26, 18, 0.75)',
-                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                        border: '1.5px solid rgba(34, 197, 94, 0.35)',
                         borderRadius: '12px',
-                        padding: '0.85rem 1rem',
+                        padding: '0.95rem 1.15rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.2rem'
+                        gap: '0.25rem',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Humidity</span>
-                          <span style={{ fontSize: '1rem' }}>💧</span>
+                          <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Humidity</span>
+                          <span style={{ fontSize: '1.1rem' }}>💧</span>
                         </div>
-                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#0284c7', fontFamily: 'var(--font-mono)' }}>
                           {mapExtWeather.humidity != null ? `${mapExtWeather.humidity}%` : 'N/A'}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#7dd3fc' }}>Relative atmospheric moisture</div>
+                        <div style={{ fontSize: '0.72rem', color: '#0369a1', fontWeight: 600 }}>Relative atmospheric moisture</div>
                       </div>
 
                       {/* Wind Speed */}
                       <div style={{
-                        background: 'rgba(10, 26, 18, 0.75)',
-                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                        border: '1.5px solid rgba(34, 197, 94, 0.35)',
                         borderRadius: '12px',
-                        padding: '0.85rem 1rem',
+                        padding: '0.95rem 1.15rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.2rem'
+                        gap: '0.25rem',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wind Speed</span>
-                          <span style={{ fontSize: '1rem' }}>💨</span>
+                          <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wind Speed</span>
+                          <span style={{ fontSize: '1.1rem' }}>💨</span>
                         </div>
-                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#a7f3d0', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#059669', fontFamily: 'var(--font-mono)' }}>
                           {mapExtWeather.wind_speed != null ? `${mapExtWeather.wind_speed} km/h` : 'N/A'}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#6ee7b7' }}>10-meter anemometer speed</div>
+                        <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>10-meter anemometer speed</div>
                       </div>
 
                       {/* Precipitation */}
                       <div style={{
-                        background: 'rgba(10, 26, 18, 0.75)',
-                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                        border: '1.5px solid rgba(34, 197, 94, 0.35)',
                         borderRadius: '12px',
-                        padding: '0.85rem 1rem',
+                        padding: '0.95rem 1.15rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.2rem'
+                        gap: '0.25rem',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Precipitation</span>
-                          <span style={{ fontSize: '1rem' }}>🌧️</span>
+                          <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Precipitation</span>
+                          <span style={{ fontSize: '1.1rem' }}>🌧️</span>
                         </div>
-                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#818cf8', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#7c3aed', fontFamily: 'var(--font-mono)' }}>
                           {mapExtWeather.precipitation != null ? `${mapExtWeather.precipitation} mm` : '0.0 mm'}
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#a5b4fc' }}>Current surface rainfall rate</div>
+                        <div style={{ fontSize: '0.72rem', color: '#6d28d9', fontWeight: 600 }}>Current surface rainfall rate</div>
                       </div>
 
                     </div>
@@ -1011,13 +1141,14 @@ export function App() {
                     {/* If a station is selected: Cross-Reference Comparison with Station Telemetry */}
                     {selectedMapStation && (
                       <div style={{
-                        background: 'rgba(10, 26, 18, 0.65)',
-                        border: '1px solid rgba(52, 211, 153, 0.22)',
-                        borderRadius: '12px',
-                        padding: '1rem 1.15rem'
+                        background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+                        border: '1.5px solid rgba(34, 197, 94, 0.45)',
+                        borderRadius: '14px',
+                        padding: '1.15rem 1.35rem',
+                        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.05)'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             ⚖️ AWS Sensor Telemetry vs External Reference Comparison
                           </div>
                           <button
@@ -1036,14 +1167,15 @@ export function App() {
                               setActiveTab('simulator')
                             }}
                             style={{
-                              background: 'rgba(16, 185, 129, 0.25)',
-                              border: '1px solid rgba(52, 211, 153, 0.6)',
-                              color: '#a7f3d0',
+                              background: '#059669',
+                              border: '1px solid #047857',
+                              color: '#ffffff',
                               borderRadius: '6px',
-                              padding: '0.25rem 0.65rem',
-                              fontSize: '0.72rem',
+                              padding: '0.3rem 0.75rem',
+                              fontSize: '0.74rem',
                               fontWeight: 700,
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 6px rgba(5,150,105,0.25)'
                             }}
                           >
                             Simulate this Station in ML Engine →
@@ -1053,44 +1185,44 @@ export function App() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
                           
                           {/* Temp diff */}
-                          <div style={{ background: 'rgba(18, 44, 33, 0.8)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.18)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                          <div style={{ background: '#ffffff', padding: '0.75rem 0.95rem', borderRadius: '10px', border: '1.5px solid #86efac' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 700 }}>
                               <span>Temperature</span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#6ee7b7' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#059669', fontWeight: 800 }}>
                                 Diff: {mapExtWeather.temperature != null ? `${(selectedMapStation.avg_temp - mapExtWeather.temperature) >= 0 ? '+' : ''}${(selectedMapStation.avg_temp - mapExtWeather.temperature).toFixed(1)}°C` : 'N/A'}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0' }}>AWS: <strong style={{ color: '#ffffff' }}>{selectedMapStation.avg_temp}°C</strong></span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>Ref: <strong>{mapExtWeather.temperature}°C</strong></span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{selectedMapStation.avg_temp}°C</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{mapExtWeather.temperature}°C</strong></span>
                             </div>
                           </div>
 
                           {/* Wind diff */}
-                          <div style={{ background: 'rgba(18, 44, 33, 0.8)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.18)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                          <div style={{ background: '#ffffff', padding: '0.75rem 0.95rem', borderRadius: '10px', border: '1.5px solid #86efac' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 700 }}>
                               <span>Wind Velocity</span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#6ee7b7' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#059669', fontWeight: 800 }}>
                                 Diff: {mapExtWeather.wind_speed != null ? `${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed).toFixed(1)} km/h` : 'N/A'}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0' }}>AWS: <strong style={{ color: '#ffffff' }}>{selectedMapStation.latest_wind || '9.4'} km/h</strong></span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>Ref: <strong>{mapExtWeather.wind_speed} km/h</strong></span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{selectedMapStation.latest_wind || '9.4'} km/h</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{mapExtWeather.wind_speed} km/h</strong></span>
                             </div>
                           </div>
 
                           {/* Rainfall diff */}
-                          <div style={{ background: 'rgba(18, 44, 33, 0.8)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.18)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                          <div style={{ background: '#ffffff', padding: '0.75rem 0.95rem', borderRadius: '10px', border: '1.5px solid #86efac' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 700 }}>
                               <span>Precipitation</span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#6ee7b7' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#059669', fontWeight: 800 }}>
                                 Diff: {mapExtWeather.precipitation != null ? `${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation).toFixed(1)} mm` : 'N/A'}
                               </span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0' }}>AWS: <strong style={{ color: '#ffffff' }}>{selectedMapStation.latest_rainfall || '0.0'} mm</strong></span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>Ref: <strong>{mapExtWeather.precipitation} mm</strong></span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{selectedMapStation.latest_rainfall || '0.0'} mm</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{mapExtWeather.precipitation} mm</strong></span>
                             </div>
                           </div>
 
@@ -1105,16 +1237,16 @@ export function App() {
 
                           return (
                             <div style={{
-                              fontSize: '0.74rem',
-                              padding: '0.4rem 0.75rem',
-                              borderRadius: '6px',
-                              backgroundColor: isSignificant ? 'rgba(239, 68, 68, 0.18)' : isModerate ? 'rgba(245, 158, 11, 0.18)' : 'rgba(16, 185, 129, 0.18)',
-                              border: `1px solid ${isSignificant ? 'rgba(239, 68, 68, 0.4)' : isModerate ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
-                              color: isSignificant ? '#fca5a5' : isModerate ? '#fcd34d' : '#86efac',
+                              fontSize: '0.78rem',
+                              padding: '0.5rem 0.85rem',
+                              borderRadius: '8px',
+                              backgroundColor: isSignificant ? '#fee2e2' : isModerate ? '#fef3c7' : '#ecfdf5',
+                              border: `1px solid ${isSignificant ? '#fca5a5' : isModerate ? '#fcd34d' : '#86efac'}`,
+                              color: isSignificant ? '#be123c' : isModerate ? '#b45309' : '#047857',
                               fontWeight: 700,
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '0.45rem',
+                              gap: '0.5rem',
                               flexWrap: 'wrap'
                             }}>
                               <span>{isSignificant ? '⚠️' : isModerate ? 'ℹ️' : '✓'}</span>
@@ -1125,7 +1257,7 @@ export function App() {
                                   ? 'Moderate variance compared with external baseline'
                                   : 'Sensor telemetry closely correlates with external baseline'}
                               </span>
-                              <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', fontWeight: 500 }}>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#475569', fontStyle: 'italic', fontWeight: 500 }}>
                                 (Station Anomaly Rate: {selectedMapStation.anomaly_rate}% • Quality Index: {selectedMapStation.health_score}%)
                               </span>
                             </div>
@@ -1137,7 +1269,16 @@ export function App() {
 
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '2rem',
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                    borderRadius: '12px',
+                    border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                    color: '#475569',
+                    fontSize: '0.86rem',
+                    fontWeight: 500
+                  }}>
                     {mapExtWeather?.error_message || 'External weather reference unavailable for this coordinate.'}
                   </div>
                 )}
@@ -1709,7 +1850,7 @@ export function App() {
                 style={{
                   background: '#ffffff',
                   color: '#0f172a',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1.5px solid #86efac',
                   borderRadius: '8px',
                   padding: '0.45rem 0.8rem',
                   fontSize: '0.82rem',
@@ -1727,7 +1868,7 @@ export function App() {
                 style={{
                   background: '#ffffff',
                   color: '#0f172a',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1.5px solid #86efac',
                   borderRadius: '8px',
                   padding: '0.45rem 0.75rem',
                   fontSize: '0.8rem',
@@ -1746,7 +1887,7 @@ export function App() {
                 style={{
                   background: '#ffffff',
                   color: '#0f172a',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1.5px solid #86efac',
                   borderRadius: '8px',
                   padding: '0.45rem 0.75rem',
                   fontSize: '0.8rem',
@@ -1764,7 +1905,7 @@ export function App() {
                 style={{
                   background: '#ffffff',
                   color: '#0f172a',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1.5px solid #86efac',
                   borderRadius: '8px',
                   padding: '0.45rem 0.75rem',
                   fontSize: '0.82rem',
@@ -1786,7 +1927,7 @@ export function App() {
                 style={{
                   background: '#ffffff',
                   color: '#0f172a',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1.5px solid #86efac',
                   borderRadius: '8px',
                   padding: '0.45rem 0.75rem',
                   fontSize: '0.82rem',
@@ -1807,7 +1948,7 @@ export function App() {
                 style={{
                   background: '#ffffff',
                   color: '#0f172a',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1.5px solid #86efac',
                   borderRadius: '8px',
                   padding: '0.45rem 0.75rem',
                   fontSize: '0.82rem',
@@ -1842,12 +1983,12 @@ export function App() {
             </div>
           </div>
 
-          {/* White Card Anomaly Records Table */}
+          {/* White + Light Green Anomaly Records Table */}
           {loadingAnomalies ? (
             <div style={{
-              background: '#ffffff',
+              background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
               borderRadius: '16px',
-              border: '1.5px solid #cbd5e1',
+              border: '1.5px solid rgba(34, 197, 94, 0.45)',
               padding: '3.5rem',
               textAlign: 'center',
               boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
@@ -1858,12 +1999,12 @@ export function App() {
             </div>
           ) : anomalies.length === 0 ? (
             <div style={{
-              background: '#ffffff',
+              background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
               borderRadius: '16px',
-              border: '1.5px solid #cbd5e1',
+              border: '1.5px solid rgba(34, 197, 94, 0.45)',
               padding: '3.5rem',
               textAlign: 'center',
-              color: '#64748b',
+              color: '#475569',
               fontSize: '0.9rem',
               boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
             }}>
@@ -1871,9 +2012,9 @@ export function App() {
             </div>
           ) : (
             <div style={{
-              background: '#ffffff',
+              background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
               borderRadius: '16px',
-              border: '1.5px solid #cbd5e1',
+              border: '1.5px solid rgba(34, 197, 94, 0.45)',
               padding: '1.25rem 1.4rem',
               boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
               overflowX: 'auto'
@@ -2245,6 +2386,622 @@ export function App() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* TAB CONTENT 6: ABOUT */}
+      {activeTab === 'about' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Main About Overview Box */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.75rem 2rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.75rem' }}>
+              <span style={{
+                backgroundColor: '#dcfce7',
+                color: '#15803d',
+                border: '1px solid #86efac',
+                padding: '0.22rem 0.6rem',
+                borderRadius: '6px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.04em'
+              }}>
+                SYSTEM DOCUMENTATION
+              </span>
+              <span style={{ fontSize: '0.76rem', color: '#059669', fontFamily: 'var(--font-mono)', fontWeight: 800 }}>
+                Automatic Weather Stations • Machine Learning
+              </span>
+            </div>
+
+            <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.85rem', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+              About AWS Anomaly Detection System
+            </h2>
+
+            <p style={{ fontSize: '0.95rem', color: '#334155', lineHeight: 1.65, margin: 0, fontWeight: 500 }}>
+              This system monitors Automatic Weather Stations and analyzes their weather observations using historical data and machine learning. Its main purpose is to identify unusual or anomalous station readings and help understand the condition of weather-station data.
+            </p>
+          </div>
+
+          {/* How the System Works Card */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.5rem 2rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
+              <span style={{ fontSize: '1.15rem' }}>⚙️</span>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                How the System Works
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.92rem', color: '#334155', lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
+              Historical weather-station observations are used as a reference for normal patterns. The machine-learning anomaly detection system analyzes observations and identifies readings that appear unusual compared with those patterns.
+            </p>
+          </div>
+
+          {/* Feature Explanations Section */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.75rem 2rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '1.15rem' }}>📋</span>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                System Features
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+              
+              {/* Feature 1 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🗺️</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    1. AWS Station Map
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Shows the locations of AWS stations and their current monitoring/anomaly status.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>⚡</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    2. Live ML Simulator
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Allows weather readings such as temperature, wind speed, humidity/moisture and rainfall to be analyzed by the ML anomaly-detection system.
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🔍</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    3. Anomaly Explorer
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Shows and helps explore weather observations that have been identified as unusual by the ML system.
+                </p>
+              </div>
+
+              {/* Feature 4 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📊</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    4. Telemetry Analytics
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Displays historical weather-station measurements through graphs and trends to help understand changes in the data.
+                </p>
+              </div>
+
+              {/* Feature 5 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📍</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    5. Station Health Network
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Provides information about the operational condition and status of monitored weather stations.
+                </p>
+              </div>
+
+              {/* Feature 6 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🌐</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    6. External Weather Reference
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Uses Open-Meteo as an external weather reference so station observations can be viewed alongside external weather information.
+                </p>
+              </div>
+
+              {/* Feature 7 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📈</span>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    7. Dashboard
+                  </h4>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                  Provides an overall summary of observations, active stations, detected anomalies and stations requiring attention.
+                </p>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Final Note Box */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.35rem 1.75rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.85rem'
+          }}>
+            <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>ℹ️</span>
+            <div>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.25rem', fontFamily: 'var(--font-mono)' }}>
+                System Scope & Intended Purpose
+              </div>
+              <p style={{ fontSize: '0.9rem', color: '#1e293b', lineHeight: 1.55, margin: 0, fontWeight: 600 }}>
+                This system focuses on weather-station monitoring and anomaly detection. It is not intended to be a general weather forecasting system.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB CONTENT 7: FUTURE SCOPE */}
+      {activeTab === 'future_scope' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Main Future Scope Overview Box */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.75rem 2rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.75rem' }}>
+              <span style={{
+                backgroundColor: '#dcfce7',
+                color: '#15803d',
+                border: '1px solid #86efac',
+                padding: '0.22rem 0.6rem',
+                borderRadius: '6px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.04em'
+              }}>
+                FUTURE SCOPE & ROADMAP
+              </span>
+              <span style={{ fontSize: '0.76rem', color: '#059669', fontFamily: 'var(--font-mono)', fontWeight: 800 }}>
+                Next-Generation Meteorological Capabilities
+              </span>
+            </div>
+
+            <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.85rem', letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+              Future Scope: AWS Anomaly Detection System
+            </h2>
+
+            <p style={{ fontSize: '0.95rem', color: '#334155', lineHeight: 1.65, margin: 0, fontWeight: 500 }}>
+              The following potential improvements outline how the system can be expanded in the future to enhance automation, detection accuracy, and real-time operational capability across weather station networks.
+            </p>
+          </div>
+
+          {/* 8 Future Improvements Grid */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.75rem 2rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '1.15rem' }}>🚀</span>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Planned Future Improvements & Operational Benefits
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.15rem' }}>
+              
+              {/* Item 1 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>🛰️</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      1. Real-Time AWS Data Integration
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Connect the system directly with live AWS/weather-station sensor data for continuous monitoring.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Reduces manual data entry and enables real-time anomaly detection.
+                </div>
+              </div>
+
+              {/* Item 2 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>🧠</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      2. Advanced ML Models
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Add and compare additional anomaly-detection models with the existing Isolation Forest.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Helps detect different types of unusual observations and improve detection performance.
+                </div>
+              </div>
+
+              {/* Item 3 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>📍</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      3. Station-Specific Learning
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Train or adapt the anomaly detection system according to the historical pattern of individual stations.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Different locations have different normal weather patterns, so station-specific analysis can improve accuracy.
+                </div>
+              </div>
+
+              {/* Item 4 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>🔔</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      4. Automatic Alerts
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Send notifications when critical or highly unusual station readings are detected.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Helps users respond quickly to important anomalies.
+                </div>
+              </div>
+
+              {/* Item 5 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>📈</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      5. Historical Comparison and Trend Analysis
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Compare current observations with previous days, months and years.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Helps identify long-term trends and unusual changes.
+                </div>
+              </div>
+
+              {/* Item 6 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>📄</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      6. Automated Anomaly Reports
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Generate daily or weekly reports containing detected anomalies and important station information.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Makes monitoring and reporting easier.
+                </div>
+              </div>
+
+              {/* Item 7 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>🌐</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      7. Weather and Sensor Data Validation
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Cross-check AWS observations with external weather sources such as Open-Meteo.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Helps identify potentially incorrect, faulty or unreliable sensor readings.
+                </div>
+              </div>
+
+              {/* Item 8 */}
+              <div style={{
+                background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                border: '1.5px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: '12px',
+                padding: '1.2rem 1.35rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '1.15rem' }}>📊</span>
+                    <h4 style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      8. Advanced Visualization
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                    Add more interactive maps, timelines and station-wise analytics.
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  fontWeight: 600
+                }}>
+                  <strong style={{ color: '#047857' }}>Benefit:</strong> Makes large amounts of weather-station data easier to understand.
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Short Closing Statement Box */}
+          <div style={{
+            background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 45%, #dcfce7 100%)',
+            border: '1.5px solid rgba(34, 197, 94, 0.45)',
+            borderRadius: '16px',
+            padding: '1.35rem 1.75rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.85rem'
+          }}>
+            <span style={{ fontSize: '1.35rem', lineHeight: 1 }}>✨</span>
+            <div>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.25rem', fontFamily: 'var(--font-mono)' }}>
+                System Vision
+              </div>
+              <p style={{ fontSize: '0.92rem', color: '#0f172a', lineHeight: 1.55, margin: 0, fontWeight: 600 }}>
+                These improvements can help transform the current anomaly-detection prototype into a more complete real-time weather-station monitoring and decision-support system.
+              </p>
+            </div>
+          </div>
+
         </div>
       )}
 
