@@ -12,12 +12,11 @@ import {
 import { StationMap } from './components/StationMap'
 import { TelemetryCharts } from './components/TelemetryCharts'
 import { SunIcon, RainIcon, CloudSunIcon, StormIcon } from './components/WeatherIcons'
-import { CinematicIntro } from './components/CinematicIntro'
-import { ProjectTour } from './components/ProjectTour'
+import { VirtualCursorDemo } from './components/VirtualCursorDemo'
 
 export function App() {
-  const [hasEntered, setHasEntered] = useState<boolean>(false)
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false)
+  const [demoStepTitle, setDemoStepTitle] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'map' | 'simulator' | 'explorer' | 'analytics' | 'stations'>('map')
   const [backendHealth, setBackendHealth] = useState<HealthResponse | null>(null)
   const [stats, setStats] = useState<DatasetStatsResponse | null>(null)
@@ -312,10 +311,6 @@ export function App() {
     return <CloudSunIcon size={64} />
   }
 
-  if (!hasEntered) {
-    return <CinematicIntro onEnter={() => setHasEntered(true)} />
-  }
-
   return (
     <div className="dashboard-root-wrapper">
       {/* CINEMATIC ATMOSPHERIC BACKDROP */}
@@ -452,6 +447,7 @@ export function App() {
               return (
                 <button
                   key={tab.id}
+                  id={`tab-btn-${tab.id}`}
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
                   title={tab.label}
@@ -467,12 +463,12 @@ export function App() {
 
         <div className="sidebar-footer">
           <button
-            onClick={() => setIsTourOpen(true)}
-            className="sidebar-tour-btn"
-            title="Launch Interactive Automated Project Demo"
+            onClick={() => setIsTourOpen(prev => !prev)}
+            className={`sidebar-tour-btn ${isTourOpen ? 'active' : ''}`}
+            title={isTourOpen ? "Stop Automated Project Demo" : "Launch Fast Automated Project Demo"}
           >
-            <span className="sidebar-icon">✨</span>
-            <span className="sidebar-label">Auto Demo</span>
+            <span className="sidebar-icon">{isTourOpen ? '⏹' : '✨'}</span>
+            <span className="sidebar-label">{isTourOpen ? 'Stop Demo' : 'Auto Demo'}</span>
           </button>
         </div>
       </aside>
@@ -505,12 +501,12 @@ export function App() {
           {/* Status Indicators & Demo Tour Trigger */}
           <div className="standalone-status-block">
             <button
-              onClick={() => setIsTourOpen(true)}
-              className="header-demo-btn"
-              title="Launch Interactive Automated Project Demo"
+              onClick={() => setIsTourOpen(prev => !prev)}
+              className={`header-demo-btn ${isTourOpen ? 'active' : ''}`}
+              title={isTourOpen ? "Stop Automated Project Demo" : "Launch Fast Automated Project Demo"}
             >
-              <span className="header-demo-sparkle">✨</span>
-              <span>Auto Project Demo</span>
+              <span className="header-demo-sparkle">{isTourOpen ? '⏹' : '✨'}</span>
+              <span>{isTourOpen ? `⏹ Stop Demo (${demoStepTitle || 'Running...'})` : 'Auto Project Demo'}</span>
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', backgroundColor: 'rgba(12, 32, 22, 0.90)', padding: '0.45rem 1.05rem', borderRadius: '9999px', border: '1px solid rgba(52, 211, 153, 0.35)', boxShadow: '0 0 16px rgba(16, 185, 129, 0.15)' }}>
@@ -689,6 +685,7 @@ export function App() {
                       Station Identifier
                     </label>
                     <input
+                      id="input-station-name"
                       type="text"
                       className="input-pill"
                       value={formData.station_name}
@@ -700,6 +697,7 @@ export function App() {
                       Elevation (m)
                     </label>
                     <input
+                      id="input-elevation"
                       type="number"
                       className="input-pill mono"
                       value={formData.elevation}
@@ -714,6 +712,7 @@ export function App() {
                       Avg Temp (°C)
                     </label>
                     <input
+                      id="input-avg-temp"
                       type="number"
                       step="0.1"
                       className="input-pill mono"
@@ -726,6 +725,7 @@ export function App() {
                       Min Temp (°C)
                     </label>
                     <input
+                      id="input-min-temp"
                       type="number"
                       step="0.1"
                       className="input-pill mono"
@@ -738,6 +738,7 @@ export function App() {
                       Max Temp (°C)
                     </label>
                     <input
+                      id="input-max-temp"
                       type="number"
                       step="0.1"
                       className="input-pill mono"
@@ -753,6 +754,7 @@ export function App() {
                       Wind Speed (km/h)
                     </label>
                     <input
+                      id="input-wind-speed"
                       type="number"
                       step="0.1"
                       className="input-pill mono"
@@ -765,6 +767,7 @@ export function App() {
                       Pressure (hPa)
                     </label>
                     <input
+                      id="input-air-pressure"
                       type="number"
                       step="0.1"
                       className="input-pill mono"
@@ -777,6 +780,7 @@ export function App() {
                       Rainfall (mm)
                     </label>
                     <input
+                      id="input-rainfall"
                       type="number"
                       step="0.1"
                       className="input-pill mono"
@@ -792,6 +796,7 @@ export function App() {
                       Latitude (°N)
                     </label>
                     <input
+                      id="input-latitude"
                       type="number"
                       step="0.0001"
                       className="input-pill mono"
@@ -804,6 +809,7 @@ export function App() {
                       Longitude (°E)
                     </label>
                     <input
+                      id="input-longitude"
                       type="number"
                       step="0.0001"
                       className="input-pill mono"
@@ -813,7 +819,7 @@ export function App() {
                   </div>
                 </div>
 
-                <button type="submit" className="btn-weather-primary" style={{ width: '100%' }} disabled={predicting}>
+                <button id="btn-run-prediction" type="submit" className="btn-weather-primary" style={{ width: '100%' }} disabled={predicting}>
                   {predicting ? 'Executing ML Isolation Trees...' : '🚀 Execute ML Anomaly Analysis'}
                 </button>
               </form>
@@ -1145,6 +1151,7 @@ export function App() {
               </select>
 
               <select
+                id="select-severity-filter"
                 className="search-pill"
                 style={{ width: '130px' }}
                 value={severityFilter}
@@ -1502,19 +1509,18 @@ export function App() {
 
       </div>
 
-      {/* AUTOMATED PROJECT DEMO WALKTHROUGH CONTROLLER */}
-      <ProjectTour
+      {/* VIRTUAL INTERACTIVE DEMO CURSOR AGENT (Zero Popups, Live Typing & Clicking) */}
+      <VirtualCursorDemo
         isOpen={isTourOpen}
-        onClose={() => setIsTourOpen(false)}
+        onClose={() => {
+          setIsTourOpen(false)
+          setDemoStepTitle('')
+        }}
         onSwitchTab={(t) => setActiveTab(t)}
-        onApplyPreset={(p) => applyPreset(p)}
+        onUpdateFormData={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
         onTriggerPrediction={() => handlePredict()}
         onFilterExplorer={(sev) => setSeverityFilter(sev)}
-        statsData={{
-          totalRecords: stats?.total_records || 970339,
-          anomalies: stats?.anomaly_records || 19407,
-          stations: stats?.unique_stations || 406
-        }}
+        onStepChange={(title) => setDemoStepTitle(title)}
       />
 
     </div>
