@@ -1,0 +1,36 @@
+{
+  "model_name": "IsolationForest_AWS_Anomaly_Detector",
+  "algorithm": "Isolation Forest (scikit-learn)",
+  "training_date": "2026-09-06T06:57:24.092406+00:00",
+  "total_training_records": 970339,
+  "features": [
+    "avg_temp",
+    "min_temp",
+    "max_temp",
+    "wind_speed",
+    "air_pressure",
+    "rainfall",
+    "elevation",
+    "latitude",
+    "longitude",
+    "temp_range"
+  ],
+  "parameters": {
+    "n_estimators": 100,
+    "contamination": 0.02,
+    "max_samples": 100000,
+    "random_state": 42
+  },
+  "results": {
+    "normal_count": 950932,
+    "anomaly_count": 19407,
+    "anomaly_percentage": 2.0,
+    "min_score": 0.3221,
+    "max_score": 0.7658,
+    "mean_score": 0.38159902601049733
+  },
+  "artifacts": {
+    "model_file": "isolation_forest_model.joblib",
+    "preprocessor_file": "preprocessor.joblib"
+  }
+}

@@ -1,0 +1,57 @@
+# Environment & Config
+.env
+.env.local
+.env.*.local
+*.log
+
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Data & Models (Large binary/CSV datasets)
+data/raw/*.csv
+data/processed/*.csv
+*.csv
+*.xlsx
+*.xls
+*.parquet
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+*.pkl
+*.joblib
+*.h5
+*.onnx
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
