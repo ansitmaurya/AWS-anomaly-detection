@@ -12,11 +12,8 @@ import {
 import { StationMap } from './components/StationMap'
 import { TelemetryCharts } from './components/TelemetryCharts'
 import { SunIcon, RainIcon, CloudSunIcon, StormIcon } from './components/WeatherIcons'
-import { VirtualCursorDemo } from './components/VirtualCursorDemo'
 
 export function App() {
-  const [isTourOpen, setIsTourOpen] = useState<boolean>(false)
-  const [demoStepTitle, setDemoStepTitle] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'map' | 'simulator' | 'explorer' | 'analytics' | 'stations'>('map')
   const [backendHealth, setBackendHealth] = useState<HealthResponse | null>(null)
   const [stats, setStats] = useState<DatasetStatsResponse | null>(null)
@@ -26,6 +23,13 @@ export function App() {
   // External Reference Weather State (Open-Meteo)
   const [simExtWeather, setSimExtWeather] = useState<ExternalWeatherResponse | null>(null)
   const [loadingSimExtWeather, setLoadingSimExtWeather] = useState<boolean>(false)
+
+  // Map Selected Location & External Weather State (Open-Meteo)
+  const [selectedMapCoord, setSelectedMapCoord] = useState<{ lat: number; lng: number; name?: string } | null>(null)
+  const [selectedMapStation, setSelectedMapStation] = useState<StationItem | null>(null)
+  const [selectedMapDistanceKm, setSelectedMapDistanceKm] = useState<number | null>(null)
+  const [mapExtWeather, setMapExtWeather] = useState<ExternalWeatherResponse | null>(null)
+  const [loadingMapExtWeather, setLoadingMapExtWeather] = useState<boolean>(false)
 
   // Map & All Stations State
   const [allStations, setAllStations] = useState<StationItem[]>([])
@@ -47,7 +51,6 @@ export function App() {
 
   const [predictResult, setPredictResult] = useState<PredictionResponse | null>(null)
   const [predicting, setPredicting] = useState<boolean>(false)
-
 
   // Anomaly Explorer State
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
@@ -98,11 +101,106 @@ export function App() {
     }
   }
 
+  // Helper to find nearest AWS station from coordinates
+  const findNearestStation = (lat: number, lng: number, stationList: StationItem[]): { station: StationItem; distanceKm: number } | null => {
+    if (!stationList || stationList.length === 0) return null
+    let minDistance = Infinity
+    let nearest: StationItem | null = null
+    for (const st of stationList) {
+      if (st.latitude == null || st.longitude == null || isNaN(Number(st.latitude)) || isNaN(Number(st.longitude))) continue
+      const dLat = (Number(st.latitude) - lat) * 111.0
+      const dLng = (Number(st.longitude) - lng) * 111.0 * Math.cos((lat * Math.PI) / 180)
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+      if (dist < minDistance) {
+        minDistance = dist
+        nearest = st
+      }
+    }
+    return nearest ? { station: nearest, distanceKm: Math.round(minDistance) } : null
+  }
+
+  const handleMapLocationSelect = (lat: number, lng: number, station?: StationItem, shouldScroll = true) => {
+    let effectiveStation = station || null
+    let distanceKm: number | null = 0
+
+    if (!effectiveStation && allStations.length > 0) {
+      const nearestResult = findNearestStation(lat, lng, allStations)
+      if (nearestResult) {
+        effectiveStation = nearestResult.station
+        distanceKm = nearestResult.distanceKm
+      }
+    }
+
+    const displayName = station 
+      ? station.station_name 
+      : effectiveStation 
+      ? `Location near ${effectiveStation.station_name} (${lat.toFixed(2)}°N, ${lng.toFixed(2)}°E)`
+      : `Map Coordinates (${lat.toFixed(2)}°N, ${lng.toFixed(2)}°E)`
+
+    setSelectedMapCoord({ lat, lng, name: displayName })
+    setSelectedMapStation(effectiveStation)
+    setSelectedMapDistanceKm(station ? 0 : distanceKm)
+    setLoadingMapExtWeather(true)
+
+    // Sync simulator form defaults if a station is resolved
+    if (effectiveStation) {
+      setFormData(prev => ({
+        ...prev,
+        station_name: effectiveStation!.station_name,
+        elevation: effectiveStation!.elevation,
+        latitude: effectiveStation!.latitude,
+        longitude: effectiveStation!.longitude,
+        avg_temp: effectiveStation!.avg_temp,
+        wind_speed: effectiveStation!.latest_wind ? parseFloat(String(effectiveStation!.latest_wind)) : prev.wind_speed,
+        air_pressure: effectiveStation!.latest_pressure ? parseFloat(String(effectiveStation!.latest_pressure)) : prev.air_pressure,
+        rainfall: effectiveStation!.latest_rainfall ? parseFloat(String(effectiveStation!.latest_rainfall)) : prev.rainfall,
+      }))
+    }
+
+    // Smooth scroll directly to the external weather & comparison card
+    if (shouldScroll) {
+      setTimeout(() => {
+        const el = document.getElementById('map-external-weather-panel')
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          el.classList.remove('panel-glow-pulse')
+          void el.offsetWidth // trigger reflow for animation restart
+          el.classList.add('panel-glow-pulse')
+        }
+      }, 80)
+    }
+
+    apiClient.getExternalWeather(lat, lng, displayName)
+      .then(res => {
+        setMapExtWeather(res)
+      })
+      .catch(() => {
+        setMapExtWeather({
+          available: false,
+          source: 'Open-Meteo',
+          station_name: displayName,
+          latitude: lat,
+          longitude: lng,
+          units: { temperature: '°C', humidity: '%', wind_speed: 'km/h', precipitation: 'mm' },
+          error_message: 'External weather reference unavailable'
+        })
+      })
+      .finally(() => {
+        setLoadingMapExtWeather(false)
+      })
+  }
+
   const fetchAllStationsForMap = async () => {
     setLoadingAllStations(true)
     try {
       const res = await apiClient.getStations({ limit: 500 })
-      setAllStations(res.items || [])
+      const items = res.items || []
+      setAllStations(items)
+      if (items.length > 0) {
+        // Auto-select initial station on page load without jumping screen
+        const initialStation = items.find(s => s.station_name.includes('Pune') || s.station_name.includes('Delhi')) || items[0]
+        handleMapLocationSelect(Number(initialStation.latitude), Number(initialStation.longitude), initialStation, false)
+      }
     } catch {
       setAllStations([])
     } finally {
@@ -462,14 +560,9 @@ export function App() {
         </div>
 
         <div className="sidebar-footer">
-          <button
-            onClick={() => setIsTourOpen(prev => !prev)}
-            className={`sidebar-tour-btn ${isTourOpen ? 'active' : ''}`}
-            title={isTourOpen ? "Stop Automated Project Demo" : "Launch Fast Automated Project Demo"}
-          >
-            <span className="sidebar-icon">{isTourOpen ? '⏹' : '✨'}</span>
-            <span className="sidebar-label">{isTourOpen ? 'Stop Demo' : 'Auto Demo'}</span>
-          </button>
+          <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.72rem', color: '#6ee7b7', fontFamily: 'var(--font-mono)', textAlign: 'center', opacity: 0.8 }}>
+            ● MET-OPS v2.4
+          </div>
         </div>
       </aside>
 
@@ -498,16 +591,8 @@ export function App() {
             </div>
           </div>
 
-          {/* Status Indicators & Demo Tour Trigger */}
+          {/* Status Indicators */}
           <div className="standalone-status-block">
-            <button
-              onClick={() => setIsTourOpen(prev => !prev)}
-              className={`header-demo-btn ${isTourOpen ? 'active' : ''}`}
-              title={isTourOpen ? "Stop Automated Project Demo" : "Launch Fast Automated Project Demo"}
-            >
-              <span className="header-demo-sparkle">{isTourOpen ? '⏹' : '✨'}</span>
-              <span>{isTourOpen ? `⏹ Stop Demo (${demoStepTitle || 'Running...'})` : 'Auto Project Demo'}</span>
-            </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', backgroundColor: 'rgba(12, 32, 22, 0.90)', padding: '0.45rem 1.05rem', borderRadius: '9999px', border: '1px solid rgba(52, 211, 153, 0.35)', boxShadow: '0 0 16px rgba(16, 185, 129, 0.15)' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: backendHealth?.status === 'healthy' ? '#10b981' : '#dc2626', boxShadow: backendHealth ? '0 0 12px rgba(16, 185, 129, 0.9)' : 'none', animation: 'nodePulse 2.5s infinite' }} />
@@ -525,33 +610,541 @@ export function App() {
         {/* MASTER WORKSPACE BOX ENCLOSING ACTIVE SECTION */}
         <div className="glass-panel" style={{ padding: '1.5rem 1.75rem', borderRadius: '18px', border: '1px solid var(--border-medium)', boxShadow: 'var(--shadow-panel)' }}>
           
-          {/* TAB CONTENT 1: AWS STATION MAP */}
+          {/* TAB CONTENT 1: AWS STATION MAP WITH LEFT-SIDE PROJECT INTRODUCTION & BOTTOM EXTERNAL WEATHER */}
           {activeTab === 'map' && (
-            <div>
-            <div style={{ marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
-                Geospatial Automatic Weather Station (AWS) Network
-              </h2>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Real telemetry coordinates across India (`7.98°N–34.08°N, 68.85°E–95.38°E`). Nodes color-coded by operational status and anomaly rate.
-            </p>
-          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 1.1fr) minmax(440px, 1.45fr)', gap: '1.75rem', alignItems: 'stretch' }}>
+                
+                {/* LEFT SIDE: PROJECT INTRODUCTION */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem', justifyContent: 'space-between' }}>
+                  
+                  {/* Main Overview Box */}
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '16px',
+                    padding: '1.5rem',
+                    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.65rem' }}>
+                      <span style={{
+                        backgroundColor: '#dcfce7',
+                        color: '#15803d',
+                        border: '1px solid #86efac',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        fontFamily: 'var(--font-mono)',
+                        letterSpacing: '0.04em'
+                      }}>
+                        ABOUT AWS SYSTEM
+                      </span>
+                      <span style={{ fontSize: '0.76rem', color: '#059669', fontFamily: 'var(--font-mono)', fontWeight: 800 }}>
+                        406 Synoptic Nodes
+                      </span>
+                    </div>
 
-          <StationMap
-            stations={allStations}
-            loading={loadingAllStations}
-            onSelectStation={(st) => {
-              setFormData(prev => ({
-                ...prev,
-                station_name: st.station_name,
-                elevation: st.elevation,
-                latitude: st.latitude,
-                longitude: st.longitude
-              }))
-            }}
-          />
-        </div>
-      )}
+                    <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.75rem', letterSpacing: '-0.01em', lineHeight: 1.25 }}>
+                      About AWS Anomaly Detection
+                    </h2>
+
+                    <p style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.55, marginBottom: '0.75rem', fontWeight: 500 }}>
+                      This system monitors Automatic Weather Stations and analyzes their weather observations using historical data and machine learning.
+                    </p>
+
+                    <p style={{ fontSize: '0.84rem', color: '#64748b', lineHeight: 1.55, margin: 0 }}>
+                      It helps identify unusual weather-station readings by comparing them with normal historical patterns. Click any station or point on the map to stream live Open-Meteo external ground truth.
+                    </p>
+                  </div>
+
+                  {/* 4 Feature Explanation Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', flex: 1 }}>
+                    
+                    {/* Card 1: Historical Data */}
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-start',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '1.05rem' }}>📊</span>
+                        <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                          Historical Data
+                        </h3>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: 0, fontWeight: 500 }}>
+                        Historical AWS observations provide the reference patterns used for analysis.
+                      </p>
+                    </div>
+
+                    {/* Card 2: ML Anomaly Detection */}
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-start',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '1.05rem' }}>⚡</span>
+                        <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                          ML Anomaly Detection
+                        </h3>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: 0, fontWeight: 500 }}>
+                        The machine-learning model identifies observations that appear unusual compared with normal patterns.
+                      </p>
+                    </div>
+
+                    {/* Card 3: Station Monitoring */}
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-start',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '1.05rem' }}>🛰️</span>
+                        <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                          Station Monitoring
+                        </h3>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: 0, fontWeight: 500 }}>
+                        The system monitors different AWS stations and their operational/anomaly status.
+                      </p>
+                    </div>
+
+                    {/* Card 4: Weather Parameters */}
+                    <div style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-start',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '1.05rem' }}>🌡️</span>
+                        <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                          Weather Parameters
+                        </h3>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: 0, fontWeight: 500 }}>
+                        Temperature, wind speed, humidity/moisture, rainfall and other station readings can be analyzed.
+                      </p>
+                    </div>
+
+                  </div>
+
+                  {/* Bottom Quick Action / Info Bar */}
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '0.75rem 1rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.76rem',
+                    color: '#334155',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.06)'
+                  }}>
+                    <span>📍 Pan-India Geospatial Telemetry Network</span>
+                    <button
+                      onClick={() => setActiveTab('simulator')}
+                      style={{
+                        background: '#059669',
+                        border: '1px solid #047857',
+                        color: '#ffffff',
+                        borderRadius: '6px',
+                        padding: '0.3rem 0.75rem',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(5,150,105,0.3)'
+                      }}
+                    >
+                      Open ML Simulator →
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* RIGHT SIDE: AWS STATION MAP */}
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <div style={{ marginBottom: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
+                        AWS Station Map
+                      </h3>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Interactive map of 406 synoptic nodes (`7.98°N–34.08°N, 68.85°E–95.38°E`). Click anywhere on map to query external weather.
+                      </p>
+                    </div>
+                  </div>
+
+                  <StationMap
+                    stations={allStations}
+                    loading={loadingAllStations}
+                    selectedCoord={selectedMapCoord}
+                    onSelectStation={(st) => {
+                      handleMapLocationSelect(Number(st.latitude), Number(st.longitude), st)
+                    }}
+                    onMapClick={(lat, lng, st) => {
+                      handleMapLocationSelect(lat, lng, st)
+                    }}
+                  />
+                </div>
+
+              </div>
+
+              {/* EXTERNAL WEATHER REFERENCE & CROSS-TELEMETRY (BELOW MAP) */}
+              <div
+                id="map-external-weather-panel"
+                style={{
+                  background: 'rgba(12, 32, 22, 0.88)',
+                  border: '1px solid rgba(52, 211, 153, 0.35)',
+                  borderRadius: '16px',
+                  padding: '1.35rem 1.6rem',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem'
+                }}
+              >
+                {/* Header Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1px solid rgba(52, 211, 153, 0.18)', paddingBottom: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      background: 'rgba(16, 185, 129, 0.18)',
+                      border: '1px solid rgba(52, 211, 153, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem'
+                    }}>
+                      🌐
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em', margin: 0 }}>
+                          External Weather Reference
+                        </h3>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '5px',
+                          background: 'rgba(52, 211, 153, 0.15)',
+                          color: '#6ee7b7',
+                          border: '1px solid rgba(52, 211, 153, 0.35)',
+                          fontWeight: 700,
+                          fontFamily: 'var(--font-mono)'
+                        }}>
+                          OPEN-METEO LIVE STREAM
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                        {selectedMapStation && (!selectedMapDistanceKm || selectedMapDistanceKm === 0) ? (
+                          <span>
+                            📍 <strong>{selectedMapStation.station_name}</strong> ({selectedMapStation.district}, {selectedMapStation.state}) • Lat: {selectedMapStation.latitude}°N, Lon: {selectedMapStation.longitude}°E • Elev: {selectedMapStation.elevation}m
+                          </span>
+                        ) : selectedMapStation && selectedMapDistanceKm && selectedMapDistanceKm > 0 ? (
+                          <span>
+                            📍 Selected Point: <strong>{selectedMapCoord?.lat.toFixed(4)}°N, {selectedMapCoord?.lng.toFixed(4)}°E</strong> • Nearest Synoptic Station: <strong>{selectedMapStation.station_name}</strong> (~{selectedMapDistanceKm} km away)
+                          </span>
+                        ) : selectedMapCoord ? (
+                          <span>
+                            📍 Selected Coordinate: <strong>{selectedMapCoord.lat.toFixed(4)}°N, {selectedMapCoord.lng.toFixed(4)}°E</strong>
+                          </span>
+                        ) : (
+                          <span>Click anywhere on the map or select any station marker to fetch real-time ground truth weather.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions & Timestamp */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    {mapExtWeather?.timestamp && (
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'var(--font-mono)' }}>
+                        Obs Time: {String(mapExtWeather.timestamp).replace('T', ' ')} UTC
+                      </span>
+                    )}
+                    {selectedMapCoord && (
+                      <button
+                        onClick={() => handleMapLocationSelect(selectedMapCoord.lat, selectedMapCoord.lng, selectedMapStation || undefined)}
+                        disabled={loadingMapExtWeather}
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          border: '1px solid rgba(52, 211, 153, 0.4)',
+                          color: '#a7f3d0',
+                          borderRadius: '6px',
+                          padding: '0.3rem 0.7rem',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: loadingMapExtWeather ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {loadingMapExtWeather ? '⏳ Updating...' : '🔄 Refresh Live Data'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Body Content */}
+                {loadingMapExtWeather ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6ee7b7', fontSize: '0.86rem', fontWeight: 600 }}>
+                    ⏳ Fetching live meteorological observation from Open-Meteo for {selectedMapCoord?.name || 'target location'}...
+                  </div>
+                ) : mapExtWeather && mapExtWeather.available ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    
+                    {/* 4 Metric Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
+                      
+                      {/* Temperature */}
+                      <div style={{
+                        background: 'rgba(10, 26, 18, 0.75)',
+                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        borderRadius: '12px',
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.2rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Temperature</span>
+                          <span style={{ fontSize: '1rem' }}>🌡️</span>
+                        </div>
+                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--font-mono)' }}>
+                          {mapExtWeather.temperature != null ? `${mapExtWeather.temperature}°C` : 'N/A'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#6ee7b7' }}>2-meter ambient air reading</div>
+                      </div>
+
+                      {/* Relative Humidity */}
+                      <div style={{
+                        background: 'rgba(10, 26, 18, 0.75)',
+                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        borderRadius: '12px',
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.2rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Humidity</span>
+                          <span style={{ fontSize: '1rem' }}>💧</span>
+                        </div>
+                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                          {mapExtWeather.humidity != null ? `${mapExtWeather.humidity}%` : 'N/A'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#7dd3fc' }}>Relative atmospheric moisture</div>
+                      </div>
+
+                      {/* Wind Speed */}
+                      <div style={{
+                        background: 'rgba(10, 26, 18, 0.75)',
+                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        borderRadius: '12px',
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.2rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wind Speed</span>
+                          <span style={{ fontSize: '1rem' }}>💨</span>
+                        </div>
+                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#a7f3d0', fontFamily: 'var(--font-mono)' }}>
+                          {mapExtWeather.wind_speed != null ? `${mapExtWeather.wind_speed} km/h` : 'N/A'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#6ee7b7' }}>10-meter anemometer speed</div>
+                      </div>
+
+                      {/* Precipitation */}
+                      <div style={{
+                        background: 'rgba(10, 26, 18, 0.75)',
+                        border: '1px solid rgba(52, 211, 153, 0.25)',
+                        borderRadius: '12px',
+                        padding: '0.85rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.2rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Precipitation</span>
+                          <span style={{ fontSize: '1rem' }}>🌧️</span>
+                        </div>
+                        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#818cf8', fontFamily: 'var(--font-mono)' }}>
+                          {mapExtWeather.precipitation != null ? `${mapExtWeather.precipitation} mm` : '0.0 mm'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#a5b4fc' }}>Current surface rainfall rate</div>
+                      </div>
+
+                    </div>
+
+                    {/* If a station is selected: Cross-Reference Comparison with Station Telemetry */}
+                    {selectedMapStation && (
+                      <div style={{
+                        background: 'rgba(10, 26, 18, 0.65)',
+                        border: '1px solid rgba(52, 211, 153, 0.22)',
+                        borderRadius: '12px',
+                        padding: '1rem 1.15rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            ⚖️ AWS Sensor Telemetry vs External Reference Comparison
+                          </div>
+                          <button
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                station_name: selectedMapStation.station_name,
+                                elevation: selectedMapStation.elevation,
+                                latitude: selectedMapStation.latitude,
+                                longitude: selectedMapStation.longitude,
+                                avg_temp: selectedMapStation.avg_temp,
+                                wind_speed: selectedMapStation.latest_wind ? parseFloat(String(selectedMapStation.latest_wind)) : prev.wind_speed,
+                                air_pressure: selectedMapStation.latest_pressure ? parseFloat(String(selectedMapStation.latest_pressure)) : prev.air_pressure,
+                                rainfall: selectedMapStation.latest_rainfall ? parseFloat(String(selectedMapStation.latest_rainfall)) : prev.rainfall,
+                              }))
+                              setActiveTab('simulator')
+                            }}
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.25)',
+                              border: '1px solid rgba(52, 211, 153, 0.6)',
+                              color: '#a7f3d0',
+                              borderRadius: '6px',
+                              padding: '0.25rem 0.65rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Simulate this Station in ML Engine →
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                          
+                          {/* Temp diff */}
+                          <div style={{ background: 'rgba(18, 44, 33, 0.8)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.18)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                              <span>Temperature</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#6ee7b7' }}>
+                                Diff: {mapExtWeather.temperature != null ? `${(selectedMapStation.avg_temp - mapExtWeather.temperature) >= 0 ? '+' : ''}${(selectedMapStation.avg_temp - mapExtWeather.temperature).toFixed(1)}°C` : 'N/A'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0' }}>AWS: <strong style={{ color: '#ffffff' }}>{selectedMapStation.avg_temp}°C</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>Ref: <strong>{mapExtWeather.temperature}°C</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Wind diff */}
+                          <div style={{ background: 'rgba(18, 44, 33, 0.8)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.18)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                              <span>Wind Velocity</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#6ee7b7' }}>
+                                Diff: {mapExtWeather.wind_speed != null ? `${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed).toFixed(1)} km/h` : 'N/A'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0' }}>AWS: <strong style={{ color: '#ffffff' }}>{selectedMapStation.latest_wind || '9.4'} km/h</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>Ref: <strong>{mapExtWeather.wind_speed} km/h</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Rainfall diff */}
+                          <div style={{ background: 'rgba(18, 44, 33, 0.8)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.18)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                              <span>Precipitation</span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#6ee7b7' }}>
+                                Diff: {mapExtWeather.precipitation != null ? `${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation).toFixed(1)} mm` : 'N/A'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#e2e8f0' }}>AWS: <strong style={{ color: '#ffffff' }}>{selectedMapStation.latest_rainfall || '0.0'} mm</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>Ref: <strong>{mapExtWeather.precipitation} mm</strong></span>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Status Check Pill */}
+                        {(() => {
+                          const tempDiff = mapExtWeather.temperature != null ? selectedMapStation.avg_temp - mapExtWeather.temperature : 0
+                          const windDiff = mapExtWeather.wind_speed != null ? Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed : 0
+                          const isSignificant = Math.abs(tempDiff) >= 5.0 || Math.abs(windDiff) >= 20.0
+                          const isModerate = !isSignificant && (Math.abs(tempDiff) >= 3.0 || Math.abs(windDiff) >= 10.0)
+
+                          return (
+                            <div style={{
+                              fontSize: '0.74rem',
+                              padding: '0.4rem 0.75rem',
+                              borderRadius: '6px',
+                              backgroundColor: isSignificant ? 'rgba(239, 68, 68, 0.18)' : isModerate ? 'rgba(245, 158, 11, 0.18)' : 'rgba(16, 185, 129, 0.18)',
+                              border: `1px solid ${isSignificant ? 'rgba(239, 68, 68, 0.4)' : isModerate ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                              color: isSignificant ? '#fca5a5' : isModerate ? '#fcd34d' : '#86efac',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              flexWrap: 'wrap'
+                            }}>
+                              <span>{isSignificant ? '⚠️' : isModerate ? 'ℹ️' : '✓'}</span>
+                              <span>
+                                {isSignificant
+                                  ? 'Significant deviation detected against real-time external baseline'
+                                  : isModerate
+                                  ? 'Moderate variance compared with external baseline'
+                                  : 'Sensor telemetry closely correlates with external baseline'}
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', fontWeight: 500 }}>
+                                (Station Anomaly Rate: {selectedMapStation.anomaly_rate}% • Quality Index: {selectedMapStation.health_score}%)
+                              </span>
+                            </div>
+                          )
+                        })()}
+
+                      </div>
+                    )}
+
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    {mapExtWeather?.error_message || 'External weather reference unavailable for this coordinate.'}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
 
       {/* TAB CONTENT 2: LIVE ML SIMULATOR */}
       {activeTab === 'simulator' && (
@@ -1097,24 +1690,33 @@ export function App() {
 
       {/* TAB CONTENT 3: ANOMALY EXPLORER */}
       {activeTab === 'explorer' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
                 Anomaly Explorer
               </h2>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                 Browsing {totalAnomaliesCount.toLocaleString()} ML-detected anomalies from the 970,339 Kaggle weather records.
               </p>
             </div>
 
-            {/* Dark Technical Search & Filter Controls */}
-            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Technical Search & Filter Controls */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <input
                 type="text"
                 placeholder="🔍 Station search..."
-                className="search-pill"
-                style={{ width: '160px' }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.8rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  width: '170px'
+                }}
                 value={stationSearch}
                 onChange={(e) => setStationSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); fetchAnomalies(); } }}
@@ -1122,8 +1724,18 @@ export function App() {
 
               <input
                 type="date"
-                className="search-pill mono"
-                style={{ width: '135px' }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  fontSize: '0.8rem',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 600,
+                  outline: 'none',
+                  width: '140px'
+                }}
                 value={startDateFilter}
                 onChange={(e) => { setStartDateFilter(e.target.value); setPage(1); }}
                 title="Filter by start date"
@@ -1131,16 +1743,35 @@ export function App() {
 
               <input
                 type="date"
-                className="search-pill mono"
-                style={{ width: '135px' }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  fontSize: '0.8rem',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 600,
+                  outline: 'none',
+                  width: '140px'
+                }}
                 value={endDateFilter}
                 onChange={(e) => { setEndDateFilter(e.target.value); setPage(1); }}
                 title="Filter by end date"
               />
 
               <select
-                className="search-pill"
-                style={{ width: '130px' }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  width: '135px'
+                }}
                 value={stateFilter}
                 onChange={(e) => { setStateFilter(e.target.value); setPage(1); }}
               >
@@ -1152,8 +1783,17 @@ export function App() {
 
               <select
                 id="select-severity-filter"
-                className="search-pill"
-                style={{ width: '130px' }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  width: '135px'
+                }}
                 value={severityFilter}
                 onChange={(e) => { setSeverityFilter(e.target.value); setPage(1); }}
               >
@@ -1164,8 +1804,17 @@ export function App() {
               </select>
 
               <select
-                className="search-pill"
-                style={{ width: '150px' }}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  width: '155px'
+                }}
                 value={sortByFilter}
                 onChange={(e) => { setSortByFilter(e.target.value); setPage(1); }}
               >
@@ -1175,74 +1824,141 @@ export function App() {
                 <option value="date_asc">Date: Oldest First</option>
               </select>
 
-              <button className="btn-weather-secondary" onClick={() => { setPage(1); fetchAnomalies(); }}>
+              <button
+                style={{
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: '1px solid rgba(52, 211, 153, 0.4)',
+                  borderRadius: '8px',
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+                onClick={() => { setPage(1); fetchAnomalies(); }}
+              >
                 Filter
               </button>
             </div>
           </div>
 
-          {/* Table */}
+          {/* White Card Anomaly Records Table */}
           {loadingAnomalies ? (
-            <div style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--met-sky)', fontSize: '0.9rem' }}>
-              <div className="skeleton-shimmer" style={{ width: '80%', height: '40px', margin: '0 auto 1rem auto' }} />
-              <div className="skeleton-shimmer" style={{ width: '90%', height: '40px', margin: '0 auto 1rem auto' }} />
-              <div className="skeleton-shimmer" style={{ width: '85%', height: '40px', margin: '0 auto' }} />
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1.5px solid #cbd5e1',
+              padding: '3.5rem',
+              textAlign: 'center',
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+            }}>
+              <div style={{ color: '#059669', fontWeight: 700, fontSize: '0.92rem' }}>
+                ⏳ Retrieving ML-detected anomaly records...
+              </div>
             </div>
           ) : anomalies.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1.5px solid #cbd5e1',
+              padding: '3.5rem',
+              textAlign: 'center',
+              color: '#64748b',
+              fontSize: '0.9rem',
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)'
+            }}>
               No anomaly records matching the selected filter criteria.
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="ops-table">
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1.5px solid #cbd5e1',
+              padding: '1.25rem 1.4rem',
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
+              overflowX: 'auto'
+            }}>
+              <table className="white-ops-table">
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Station</th>
+                    <th>Station Name</th>
                     <th>State</th>
                     <th>Avg Temp</th>
                     <th>Min / Max</th>
-                    <th>Wind</th>
+                    <th>Wind Speed</th>
                     <th>Pressure</th>
-                    <th>Rain (mm)</th>
-                    <th>Severity & Score</th>
-                    <th>ML Diagnostic</th>
+                    <th>Precipitation</th>
+                    <th>Anomaly Severity</th>
+                    <th>ML Physical Diagnostic</th>
                   </tr>
                 </thead>
                 <tbody>
                   {anomalies.map((item, idx) => {
+                    const isHigh = item.severity === 'HIGH'
+                    const isMed = item.severity === 'MEDIUM'
+
                     return (
                       <tr key={idx}>
-                        <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>
+                        <td className="font-mono" style={{ whiteSpace: 'nowrap', color: '#475569', fontWeight: 600 }}>
                           {item.date_of_record ? String(item.date_of_record).slice(0, 10) : 'N/A'}
                         </td>
-                        <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                          {item.station_name}
+                        <td style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
+                          📍 {item.station_name}
                         </td>
                         <td>
-                          <span style={{ backgroundColor: 'rgba(12, 28, 20, 0.8)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', fontFamily: 'var(--font-mono)', border: '1px solid var(--border-subtle)' }}>
+                          <span style={{
+                            backgroundColor: '#f1f5f9',
+                            color: '#0f172a',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            fontFamily: 'var(--font-mono)',
+                            border: '1px solid #cbd5e1',
+                            fontWeight: 700
+                          }}>
                             {item.state}
                           </span>
                         </td>
-                        <td className="font-mono">{item.avg_temp}°C</td>
-                        <td className="font-mono" style={{ color: Number(item.max_temp) > 50 ? 'var(--met-rose)' : 'inherit', fontWeight: Number(item.max_temp) > 50 ? 700 : 'normal' }}>
+                        <td className="font-mono" style={{ color: '#0f172a', fontWeight: 700 }}>
+                          {item.avg_temp}°C
+                        </td>
+                        <td className="font-mono" style={{ color: Number(item.max_temp) > 50 ? '#e11d48' : '#334155', fontWeight: Number(item.max_temp) > 50 ? 800 : 600 }}>
                           {item.min_temp}° / {item.max_temp}°C
                         </td>
-                        <td className="font-mono">{item.wind_speed} km/h</td>
-                        <td className="font-mono">{item.air_pressure} hPa</td>
-                        <td className="font-mono" style={{ color: Number(item.rainfall) > 200 ? 'var(--met-sky)' : 'inherit' }}>
-                          {item.rainfall}
+                        <td className="font-mono" style={{ color: '#0f172a', fontWeight: 600 }}>
+                          {item.wind_speed} km/h
+                        </td>
+                        <td className="font-mono" style={{ color: '#0f172a', fontWeight: 600 }}>
+                          {item.air_pressure} hPa
+                        </td>
+                        <td className="font-mono" style={{ color: Number(item.rainfall) > 200 ? '#0284c7' : '#0f172a', fontWeight: Number(item.rainfall) > 200 ? 800 : 600 }}>
+                          {item.rainfall} mm
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span className={`ops-badge ${item.severity === 'HIGH' ? 'badge-coral' : item.severity === 'MEDIUM' ? 'badge-amber' : 'badge-cyan'}`}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0.22rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              fontFamily: 'var(--font-mono)',
+                              backgroundColor: isHigh ? '#fee2e2' : isMed ? '#fef3c7' : '#ecfdf5',
+                              color: isHigh ? '#be123c' : isMed ? '#b45309' : '#047857',
+                              border: `1px solid ${isHigh ? '#fca5a5' : isMed ? '#fcd34d' : '#a7f3d0'}`
+                            }}>
                               {item.severity} ({Number(item.anomaly_score).toFixed(4)})
                             </span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>ML-detected anomaly</span>
+                            <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>
+                              Isolation Score
+                            </span>
                           </div>
                         </td>
-                        <td style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', maxWidth: '280px', lineHeight: 1.35 }}>
-                          {item.explanation || 'Multivariate statistical isolation'}
+                        <td style={{ fontSize: '0.78rem', color: '#334155', maxWidth: '300px', lineHeight: 1.4, fontWeight: 500 }}>
+                          {item.explanation || 'Multivariate statistical isolation deviation'}
                         </td>
                       </tr>
                     )
@@ -1251,20 +1967,45 @@ export function App() {
               </table>
 
               {/* Pagination */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
-                <span className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '1.25rem',
+                paddingTop: '1rem',
+                borderTop: '1.5px solid #e2e8f0'
+              }}>
+                <span className="font-mono" style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
                   Page {page} of {totalPages} ({totalAnomaliesCount.toLocaleString()} Total Anomalies)
                 </span>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
-                    className="btn-weather-secondary"
+                    style={{
+                      background: '#f1f5f9',
+                      color: page <= 1 ? '#94a3b8' : '#0f172a',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: page <= 1 ? 'not-allowed' : 'pointer'
+                    }}
                     disabled={page <= 1}
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                   >
                     ← Previous
                   </button>
                   <button
-                    className="btn-weather-secondary"
+                    style={{
+                      background: '#f1f5f9',
+                      color: page >= totalPages ? '#94a3b8' : '#0f172a',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: page >= totalPages ? 'not-allowed' : 'pointer'
+                    }}
                     disabled={page >= totalPages}
                     onClick={() => setPage(p => p + 1)}
                   >
@@ -1508,20 +2249,6 @@ export function App() {
       )}
 
       </div>
-
-      {/* VIRTUAL INTERACTIVE DEMO CURSOR AGENT (Zero Popups, Live Typing & Clicking) */}
-      <VirtualCursorDemo
-        isOpen={isTourOpen}
-        onClose={() => {
-          setIsTourOpen(false)
-          setDemoStepTitle('')
-        }}
-        onSwitchTab={(t) => setActiveTab(t)}
-        onUpdateFormData={(updates) => setFormData(prev => ({ ...prev, ...updates }))}
-        onTriggerPrediction={() => handlePredict()}
-        onFilterExplorer={(sev) => setSeverityFilter(sev)}
-        onStepChange={(title) => setDemoStepTitle(title)}
-      />
 
     </div>
     </div>

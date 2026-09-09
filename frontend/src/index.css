@@ -1298,6 +1298,45 @@ body {
   border-left: 3px solid var(--met-mint);
 }
 
+/* Clean High-Contrast White Anomaly Table */
+.white-ops-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.84rem;
+}
+
+.white-ops-table th {
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.white-ops-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+  vertical-align: middle;
+  transition: all 0.15s ease;
+  background: #ffffff;
+}
+
+.white-ops-table tr:hover td {
+  background: #f0fdf4 !important;
+  color: #000000;
+  border-bottom-color: #86efac;
+}
+
+.white-ops-table tr:hover td:first-child {
+  border-left: 3.5px solid #059669;
+}
+
 /* ===================================================
    LEAFLET MAP & DARK ATMOSPHERIC POPUP STYLING
 =================================================== */
@@ -1827,187 +1866,7 @@ body {
 
 /* ===================================================
    AUTOMATED PROJECT DEMO & TOUR HUD STYLES
-================================================== */
 
-.header-demo-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 1.15rem;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28) 0%, rgba(5, 150, 105, 0.42) 100%);
-  border: 1px solid rgba(52, 211, 153, 0.65);
-  border-radius: 9999px;
-  color: #ffffff;
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 
-    0 0 18px rgba(16, 185, 129, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-  animation: tourButtonPulse 3s infinite alternate;
-}
-
-.header-demo-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transition: left 0.6s ease;
-}
-
-.header-demo-btn:hover {
-  transform: translateY(-2px) scale(1.02);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.45) 0%, rgba(5, 150, 105, 0.6) 100%);
-  border-color: rgba(110, 231, 183, 0.95);
-  box-shadow: 
-    0 4px 22px rgba(16, 185, 129, 0.55),
-    0 0 30px rgba(52, 211, 153, 0.4);
-}
-
-.header-demo-btn:hover::before {
-  left: 100%;
-}
-
-.header-demo-btn:active {
-  transform: translateY(0) scale(0.98);
-}
-
-.header-demo-sparkle {
-  font-size: 1rem;
-  display: inline-block;
-  animation: spinSparkle 4s linear infinite;
-}
-
-@keyframes tourButtonPulse {
-  0% {
-    box-shadow: 0 0 14px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  }
-  100% {
-    box-shadow: 0 0 24px rgba(52, 211, 153, 0.55), 0 0 4px rgba(255, 255, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  }
-}
-
-@keyframes spinSparkle {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.15); }
-  100% { transform: rotate(360deg) scale(1); }
-}
-
-.header-demo-btn.active,
-.sidebar-tour-btn.active {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.35) 0%, rgba(185, 28, 28, 0.5) 100%) !important;
-  border-color: rgba(248, 113, 113, 0.85) !important;
-  color: #fecaca !important;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.45) !important;
-}
-
-/* ===================================================
-   VIRTUAL INTERACTIVE DEMO CURSOR AGENT
-   (Live Pointer Navigation, Typing & Clicking - Zero Obstructive Popups)
-================================================== */
-
-.virtual-cursor-layer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 999999;
-  overflow: hidden;
-}
-
-.virtual-cursor-agent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  pointer-events: none;
-  will-change: transform;
-}
-
-.virtual-cursor-arrow {
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 8px rgba(16, 185, 129, 0.85));
-  transform-origin: 3px 2px;
-  transition: transform 0.15s ease;
-}
-
-.virtual-cursor-agent.clicking .virtual-cursor-arrow {
-  transform: scale(0.85) rotate(-6deg);
-}
-
-.virtual-cursor-ripple {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 32px;
-  height: 32px;
-  margin-top: -8px;
-  margin-left: -8px;
-  border-radius: 50%;
-  border: 2px solid #34d399;
-  background: rgba(16, 185, 129, 0.35);
-  animation: cursorRipple 0.45s ease-out forwards;
-}
-
-@keyframes cursorRipple {
-  0% {
-    transform: scale(0.3);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
-}
-
-.virtual-cursor-label {
-  margin-top: 6px;
-  margin-left: 18px;
-  background: rgba(6, 24, 16, 0.95);
-  border: 1px solid rgba(52, 211, 153, 0.7);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(16, 185, 129, 0.35);
-  padding: 0.28rem 0.65rem;
-  border-radius: 8px;
-  color: #ffffff;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  font-weight: 700;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  animation: fadeInLabel 0.2s ease forwards;
-}
-
-.virtual-cursor-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background-color: #10b981;
-  box-shadow: 0 0 8px #10b981;
-  animation: nodePulse 1.5s infinite;
-}
-
-@keyframes fadeInLabel {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /* ===================================================
    VERTICAL LEFT COLLAPSIBLE SIDEBAR (HOVER TO EXPAND)
@@ -2300,6 +2159,26 @@ body {
   .standalone-project-title {
     font-size: 1.75rem;
   }
+}
+
+/* Highlight / Attention Glow for External Weather on Map Click */
+@keyframes panelGlowPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7), 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-color: rgba(52, 211, 153, 0.9);
+  }
+  50% {
+    box-shadow: 0 0 28px 6px rgba(52, 211, 153, 0.45), 0 14px 34px rgba(0, 0, 0, 0.6);
+    border-color: #34d399;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0), 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-color: rgba(52, 211, 153, 0.35);
+  }
+}
+
+.panel-glow-pulse {
+  animation: panelGlowPulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 
