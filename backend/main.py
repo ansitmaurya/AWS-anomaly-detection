@@ -55,31 +55,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global dataset & analytical caches for sub-millisecond response times
+# Global dataset & analytical caches for sub-millisecond response times (<70 MB RAM footprint)
 _cached_df: Optional[pd.DataFrame] = None
 _cached_anomalies_df: Optional[pd.DataFrame] = None
 _cached_station_summary_df: Optional[pd.DataFrame] = None
 _cached_stats: Optional[Dict[str, Any]] = None
 _cached_telemetry: Optional[Dict[str, Any]] = None
-_station_timeseries_index: Dict[str, Tuple[str, pd.DataFrame]] = {}
+_station_timeseries_ranges: Dict[str, Tuple[str, int, int]] = {}
 _district_to_station_map: Dict[str, str] = {}
+
+DATASET_DTYPES = {
+    "date_of_record": "category",
+    "season": "category",
+    "station_name": "category",
+    "state": "category",
+    "district": "category",
+    "avg_temp": "float32",
+    "min_temp": "float32",
+    "max_temp": "float32",
+    "wind_speed": "float32",
+    "air_pressure": "float32",
+    "rainfall": "float32",
+    "elevation": "float32",
+    "latitude": "float32",
+    "longitude": "float32",
+    "anomaly": "int8",
+    "anomaly_score": "float32",
+}
 
 
 def _init_dataset_caches(df: pd.DataFrame):
     """Pre-compute aggregations in vectorised C-speed to eliminate request latency & 502 timeouts."""
-    global _cached_anomalies_df, _cached_station_summary_df, _cached_stats, _cached_telemetry
-    global _station_timeseries_index, _district_to_station_map
+    global _cached_df, _cached_anomalies_df, _cached_station_summary_df, _cached_stats, _cached_telemetry
+    global _station_timeseries_ranges, _district_to_station_map
     try:
-        total = len(df)
-        anomalies_count = int((df["anomaly"] == 1).sum())
+        # Sort and re-index contiguous records by station_name and date_of_record for O(1) slicing
+        sorted_df = df.sort_values(["station_name", "date_of_record"]).reset_index(drop=True)
+        _cached_df = sorted_df
+
+        total = len(sorted_df)
+        anomalies_count = int((sorted_df["anomaly"] == 1).sum())
         normals_count = total - anomalies_count
 
-        # 1. Pre-filter anomaly subset
-        _cached_anomalies_df = df[df["anomaly"] == 1].copy()
+        # 1. Pre-filter anomaly subset (~48k rows, ~3MB RAM)
+        _cached_anomalies_df = sorted_df[sorted_df["anomaly"] == 1].copy()
 
         # 2. Vectorized station aggregations (using fast C 'sum' and 'count')
         station_agg = (
-            df.groupby(["station_name", "state", "district"])
+            sorted_df.groupby(["station_name", "state", "district"], observed=True)
             .agg(
                 total_records=("anomaly", "count"),
                 anomalies=("anomaly", "sum"),
@@ -99,7 +122,7 @@ def _init_dataset_caches(df: pd.DataFrame):
 
         station_agg["anomaly_rate"] = (station_agg["anomalies"] / station_agg["total_records"] * 100).round(2)
         station_agg["health_score"] = station_agg["anomaly_rate"].apply(
-            lambda r: max(0.0, min(100.0, round(100.0 - (r * 2.5), 1)))
+            lambda r: max(0.0, min(100.0, round(100.0 - (float(r) * 2.5), 1)))
         )
 
         def get_status(rate: float) -> str:
@@ -121,26 +144,26 @@ def _init_dataset_caches(df: pd.DataFrame):
             "normal_records": normals_count,
             "anomaly_records": anomalies_count,
             "anomaly_percentage": round((anomalies_count / total) * 100, 2) if total > 0 else 0.0,
-            "unique_stations": int(df["station_name"].nunique()),
-            "unique_states": int(df["state"].nunique()),
-            "unique_districts": int(df["district"].nunique()),
+            "unique_stations": int(sorted_df["station_name"].nunique()),
+            "unique_states": int(sorted_df["state"].nunique()),
+            "unique_districts": int(sorted_df["district"].nunique()),
             "stations_requiring_attention": stations_attention,
-            "available_states": sorted(df["state"].dropna().unique().tolist()),
-            "available_districts": sorted(df["district"].dropna().unique().tolist())[:100],
+            "available_states": sorted([str(s) for s in sorted_df["state"].dropna().unique().tolist()]),
+            "available_districts": sorted([str(d) for d in sorted_df["district"].dropna().unique().tolist()])[:100],
             "date_range": {
-                "start": str(df["date_of_record"].min())[:10],
-                "end": str(df["date_of_record"].max())[:10]
+                "start": str(sorted_df["date_of_record"].astype(str).min())[:10],
+                "end": str(sorted_df["date_of_record"].astype(str).max())[:10]
             },
             "averages": {
-                "avg_temp": round(float(df["avg_temp"].mean()), 1),
-                "wind_speed": round(float(df["wind_speed"].dropna().mean()), 1),
-                "air_pressure": round(float(df["air_pressure"].dropna().mean()), 1),
-                "rainfall": round(float(df["rainfall"].dropna().mean()), 1)
+                "avg_temp": round(float(sorted_df["avg_temp"].mean()), 1),
+                "wind_speed": round(float(sorted_df["wind_speed"].dropna().mean()), 1),
+                "air_pressure": round(float(sorted_df["air_pressure"].dropna().mean()), 1),
+                "rainfall": round(float(sorted_df["rainfall"].dropna().mean()), 1)
             }
         }
 
         # 4. Pre-computed telemetry analytics
-        seasonal_counts = df["season"].value_counts().to_dict()
+        seasonal_counts = sorted_df["season"].value_counts().to_dict()
         seasonal_data = []
         color_map = {
             "Winter": "#38bdf8",
@@ -152,11 +175,11 @@ def _init_dataset_caches(df: pd.DataFrame):
             pct = round((count / total) * 100, 1)
             seasonal_data.append({
                 "name": f"{season_name} Telemetry",
-                "season": season_name,
+                "season": str(season_name),
                 "count": f"{count:,} Records",
-                "raw_count": count,
+                "raw_count": int(count),
                 "pct": pct,
-                "color": color_map.get(season_name, "#64748b")
+                "color": color_map.get(str(season_name), "#64748b")
             })
 
         _cached_telemetry = {
@@ -164,46 +187,44 @@ def _init_dataset_caches(df: pd.DataFrame):
             "seasons": seasonal_data,
             "ranges": {
                 "avg_temp": {
-                    "mean": round(float(df["avg_temp"].mean()), 1),
-                    "min": round(float(df["avg_temp"].min()), 1),
-                    "max": round(float(df["avg_temp"].max()), 1),
-                    "std": round(float(df["avg_temp"].std()), 1)
+                    "mean": round(float(sorted_df["avg_temp"].mean()), 1),
+                    "min": round(float(sorted_df["avg_temp"].min()), 1),
+                    "max": round(float(sorted_df["avg_temp"].max()), 1),
+                    "std": round(float(sorted_df["avg_temp"].std()), 1)
                 },
                 "wind_speed": {
-                    "mean": round(float(df["wind_speed"].dropna().mean()), 1),
-                    "min": round(float(df["wind_speed"].dropna().min()), 1),
-                    "max": round(float(df["wind_speed"].dropna().max()), 1),
-                    "std": round(float(df["wind_speed"].dropna().std()), 1)
+                    "mean": round(float(sorted_df["wind_speed"].dropna().mean()), 1),
+                    "min": round(float(sorted_df["wind_speed"].dropna().min()), 1),
+                    "max": round(float(sorted_df["wind_speed"].dropna().max()), 1),
+                    "std": round(float(sorted_df["wind_speed"].dropna().std()), 1)
                 },
                 "air_pressure": {
-                    "mean": round(float(df["air_pressure"].dropna().mean()), 1),
-                    "min": round(float(df["air_pressure"].dropna().min()), 1),
-                    "max": round(float(df["air_pressure"].dropna().max()), 1),
-                    "std": round(float(df["air_pressure"].dropna().std()), 1)
+                    "mean": round(float(sorted_df["air_pressure"].dropna().mean()), 1),
+                    "min": round(float(sorted_df["air_pressure"].dropna().min()), 1),
+                    "max": round(float(sorted_df["air_pressure"].dropna().max()), 1),
+                    "std": round(float(sorted_df["air_pressure"].dropna().std()), 1)
                 },
                 "rainfall": {
-                    "mean": round(float(df["rainfall"].dropna().mean()), 1),
-                    "min": round(float(df["rainfall"].dropna().min()), 1),
-                    "max": round(float(df["rainfall"].dropna().max()), 1),
-                    "std": round(float(df["rainfall"].dropna().std()), 1)
+                    "mean": round(float(sorted_df["rainfall"].dropna().mean()), 1),
+                    "min": round(float(sorted_df["rainfall"].dropna().min()), 1),
+                    "max": round(float(sorted_df["rainfall"].dropna().max()), 1),
+                    "std": round(float(sorted_df["rainfall"].dropna().std()), 1)
                 }
             }
         }
 
-        # 5. Pre-computed indexed station timeseries in C-speed
-        sorted_df = df.sort_values(["station_name", "date_of_record"])
-        cols_to_keep = [
-            "date_of_record", "station_name", "avg_temp", "min_temp", "max_temp",
-            "wind_speed", "air_pressure", "rainfall", "anomaly", "anomaly_score"
-        ]
-        station_index = {}
-        for station_name, group in sorted_df.groupby("station_name"):
-            st_lower = str(station_name).strip().lower()
-            station_index[st_lower] = (str(station_name), group[cols_to_keep])
-        _station_timeseries_index = station_index
+        # 5. Low-memory contiguous slice range index for station timeseries
+        station_ranges = {}
+        for st_name, group_indices in sorted_df.groupby("station_name", observed=True).groups.items():
+            st_lower = str(st_name).strip().lower()
+            start_idx = int(group_indices[0])
+            end_idx = int(group_indices[-1]) + 1
+            station_ranges[st_lower] = (str(st_name), start_idx, end_idx)
+        _station_timeseries_ranges = station_ranges
 
+        # 6. District to station mapping
         district_map = {}
-        for _, row in df[["station_name", "district"]].drop_duplicates().iterrows():
+        for _, row in sorted_df[["station_name", "district"]].drop_duplicates().iterrows():
             d = str(row["district"]).strip().lower()
             if d and d not in district_map:
                 district_map[d] = str(row["station_name"]).strip().lower()
@@ -215,55 +236,71 @@ def _init_dataset_caches(df: pd.DataFrame):
 
 def match_station_timeseries(station_query: Optional[str]) -> Tuple[str, pd.DataFrame]:
     """
-    Intelligent O(1) matching for station time series.
+    Intelligent O(1) matching for station time series using zero-copy DataFrame slicing.
     Handles exact names, noise tokens (AWS, AWS-104), district names, and substrings.
     """
-    if not _station_timeseries_index:
+    if not _station_timeseries_ranges or _cached_df is None:
         return ("Srinagar", pd.DataFrame())
 
+    cols_to_keep = [
+        "date_of_record", "station_name", "avg_temp", "min_temp", "max_temp",
+        "wind_speed", "air_pressure", "rainfall", "anomaly", "anomaly_score"
+    ]
+
+    def get_slice(start_idx: int, end_idx: int) -> pd.DataFrame:
+        return _cached_df.iloc[start_idx:end_idx][cols_to_keep]
+
     if not station_query or not station_query.strip():
-        if "srinagar" in _station_timeseries_index:
-            return _station_timeseries_index["srinagar"]
-        first_key = next(iter(_station_timeseries_index))
-        return _station_timeseries_index[first_key]
+        if "srinagar" in _station_timeseries_ranges:
+            name, s, e = _station_timeseries_ranges["srinagar"]
+            return name, get_slice(s, e)
+        first_key = next(iter(_station_timeseries_ranges))
+        name, s, e = _station_timeseries_ranges[first_key]
+        return name, get_slice(s, e)
 
     q_raw = station_query.strip().lower()
     q_clean = re.sub(r'\b(aws|station)\b[-\w]*', '', q_raw).strip()
     q_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', q_clean).strip()
 
     # 1. Exact match on raw query
-    if q_raw in _station_timeseries_index:
-        return _station_timeseries_index[q_raw]
+    if q_raw in _station_timeseries_ranges:
+        name, s, e = _station_timeseries_ranges[q_raw]
+        return name, get_slice(s, e)
 
     # 2. Exact match on cleaned query
-    if q_clean and q_clean in _station_timeseries_index:
-        return _station_timeseries_index[q_clean]
+    if q_clean and q_clean in _station_timeseries_ranges:
+        name, s, e = _station_timeseries_ranges[q_clean]
+        return name, get_slice(s, e)
 
     # 3. District lookup
-    if q_clean in _district_to_station_map and _district_to_station_map[q_clean] in _station_timeseries_index:
-        return _station_timeseries_index[_district_to_station_map[q_clean]]
+    if q_clean in _district_to_station_map and _district_to_station_map[q_clean] in _station_timeseries_ranges:
+        target_key = _district_to_station_map[q_clean]
+        name, s, e = _station_timeseries_ranges[target_key]
+        return name, get_slice(s, e)
 
     # 4. Substring / Prefix match in station names
-    for key, val in _station_timeseries_index.items():
+    for key, (name, s, e) in _station_timeseries_ranges.items():
         if q_clean and (q_clean in key or key in q_clean):
-            return val
+            return name, get_slice(s, e)
 
     # 5. Token match
     tokens = [t for t in q_clean.split() if len(t) > 2]
     for token in tokens:
-        for key, val in _station_timeseries_index.items():
+        for key, (name, s, e) in _station_timeseries_ranges.items():
             if token in key:
-                return val
+                return name, get_slice(s, e)
 
     # 6. Fallback
-    if "srinagar" in _station_timeseries_index:
-        return _station_timeseries_index["srinagar"]
-    first_key = next(iter(_station_timeseries_index))
-    return _station_timeseries_index[first_key]
+    if "srinagar" in _station_timeseries_ranges:
+        name, s, e = _station_timeseries_ranges["srinagar"]
+        return name, get_slice(s, e)
+    first_key = next(iter(_station_timeseries_ranges))
+    name, s, e = _station_timeseries_ranges[first_key]
+    return name, get_slice(s, e)
 
 
 def get_dataset() -> Optional[pd.DataFrame]:
-    """Lazily load and cache processed dataset for fast querying."""
+    """Lazily load and cache processed dataset with optimized low-memory types."""
     global _cached_df
     if _cached_df is not None:
         return _cached_df
@@ -273,14 +310,17 @@ def get_dataset() -> Optional[pd.DataFrame]:
         PROJECT_ROOT / "aws_anomaly_predictions.csv",
         PROJECT_ROOT / "data" / "aws_anomaly_predictions.csv",
         Path("data/processed/aws_anomaly_predictions.csv").resolve(),
-        Path("data/aws_anomaly_predictions.csv").resolve()
+        Path("data/aws_anomaly_predictions.csv").resolve(),
+        Path("../data/processed/aws_anomaly_predictions.csv").resolve(),
+        Path("../data/aws_anomaly_predictions.csv").resolve()
     ]
     
     for csv_path in potential_paths:
         if csv_path.exists():
             try:
-                _cached_df = pd.read_csv(
+                raw_df = pd.read_csv(
                     csv_path,
+                    dtype=DATASET_DTYPES,
                     usecols=[
                         "date_of_record", "season", "station_name", "state", "district",
                         "avg_temp", "min_temp", "max_temp", "wind_speed",
@@ -288,7 +328,7 @@ def get_dataset() -> Optional[pd.DataFrame]:
                         "anomaly", "anomaly_score"
                     ]
                 )
-                _init_dataset_caches(_cached_df)
+                _init_dataset_caches(raw_df)
                 return _cached_df
             except Exception as e:
                 print(f"[Warning] Could not load CSV dataset from {csv_path}: {e}")
@@ -634,45 +674,10 @@ def get_dataset_stats():
         return _cached_stats
         
     df = get_dataset()
-    if df is None:
+    if df is None or _cached_stats is None:
         raise HTTPException(status_code=404, detail="Processed anomaly dataset not found. Please train model first.")
     
-    if _cached_stats is not None:
-        return _cached_stats
-
-    total = len(df)
-    anomalies = int((df["anomaly"] == 1).sum())
-    normals = total - anomalies
-    
-    st_agg = df.groupby("station_name", as_index=False).agg(
-        total_records=("anomaly", "count"),
-        anomalies=("anomaly", "sum")
-    )
-    st_agg["anomaly_rate"] = st_agg["anomalies"] / st_agg["total_records"] * 100
-    stations_attention = int((st_agg["anomaly_rate"] > 5.0).sum())
-    
-    return {
-        "total_records": total,
-        "normal_records": normals,
-        "anomaly_records": anomalies,
-        "anomaly_percentage": round((anomalies / total) * 100, 2) if total > 0 else 0.0,
-        "unique_stations": int(df["station_name"].nunique()),
-        "unique_states": int(df["state"].nunique()),
-        "unique_districts": int(df["district"].nunique()),
-        "stations_requiring_attention": stations_attention,
-        "available_states": sorted(df["state"].dropna().unique().tolist()),
-        "available_districts": sorted(df["district"].dropna().unique().tolist())[:100],
-        "date_range": {
-            "start": str(df["date_of_record"].min())[:10],
-            "end": str(df["date_of_record"].max())[:10]
-        },
-        "averages": {
-            "avg_temp": round(float(df["avg_temp"].mean()), 1),
-            "wind_speed": round(float(df["wind_speed"].dropna().mean()), 1),
-            "air_pressure": round(float(df["air_pressure"].dropna().mean()), 1),
-            "rainfall": round(float(df["rainfall"].dropna().mean()), 1)
-        }
-    }
+    return _cached_stats
 
 
 @app.get("/api/stations")

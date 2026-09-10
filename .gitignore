@@ -81,7 +81,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # ------------------------------------------------------------------------------
-# 5. Data & Datasets (Prevent uploading heavy raw files & binary dumps)
+# 5. Data & Datasets
 # ------------------------------------------------------------------------------
 *.csv
 *.tsv
@@ -93,6 +93,8 @@ data/raw/*
 !data/raw/india_weather_rainfall_data.xlsx
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/aws_anomaly_predictions.csv
+!data/aws_anomaly_predictions.csv
 !data/README.md
 
 # ------------------------------------------------------------------------------
@@ -106,8 +108,13 @@ data/processed/*
 *.pth
 *.ckpt
 
-# Keep ML directory structure intact
+# Keep ML directory structure & trained model artifacts intact
 !ml/models/.gitkeep
+!ml/models/*.joblib
+!ml/models/*.json
+!ml/models/isolation_forest_model.joblib
+!ml/models/preprocessor.joblib
+!ml/models/model_metadata.json
 !ml/src/.gitkeep
 !ml/README.md
 
