@@ -2,8 +2,6 @@
 *.tsv
 *.parquet
 *.json
-*.xlsx
-*.xls
 !README.md
 !raw/.gitkeep
 !processed/.gitkeep
