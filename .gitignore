@@ -90,6 +90,7 @@ lerna-debug.log*
 # Explicit Data folder rules
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/india_weather_rainfall_data.xlsx
 data/processed/*
 !data/processed/.gitkeep
 !data/README.md
