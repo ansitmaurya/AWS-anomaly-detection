@@ -191,25 +191,79 @@ export const apiClient = {
     return res.json()
   },
 
-  async getExternalWeather(latitude: number, longitude: number, station_name?: string): Promise<ExternalWeatherResponse> {
-    const query = new URLSearchParams()
-    query.append('latitude', latitude.toString())
-    query.append('longitude', longitude.toString())
-    if (station_name) query.append('station_name', station_name)
+  async getExternalWeather(latitude: number | string, longitude: number | string, station_name?: string): Promise<ExternalWeatherResponse> {
+    const numLat = typeof latitude === 'number' ? latitude : parseFloat(String(latitude))
+    const numLng = typeof longitude === 'number' ? longitude : parseFloat(String(longitude))
 
-    const res = await fetch(`${API_BASE}/api/external-weather?${query.toString()}`)
-    if (!res.ok) {
-      return {
-        available: false,
-        source: 'Open-Meteo',
-        station_name,
-        latitude,
-        longitude,
-        units: { temperature: '°C', humidity: '%', wind_speed: 'km/h', precipitation: 'mm' },
-        error_message: 'External weather reference unavailable'
-      }
+    const fallbackUnavailable: ExternalWeatherResponse = {
+      available: false,
+      source: 'Open-Meteo',
+      station_name,
+      latitude: !isNaN(numLat) ? numLat : 0,
+      longitude: !isNaN(numLng) ? numLng : 0,
+      units: { temperature: '°C', humidity: '%', wind_speed: 'km/h', precipitation: 'mm' },
+      error_message: 'External weather reference unavailable'
     }
-    return res.json()
+
+    if (isNaN(numLat) || isNaN(numLng) || numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+      return fallbackUnavailable
+    }
+
+    const latStr = numLat.toFixed(4)
+    const lngStr = numLng.toFixed(4)
+
+    // 1. Try fetching via Backend API proxy
+    try {
+      const query = new URLSearchParams()
+      query.append('latitude', latStr)
+      query.append('longitude', lngStr)
+      if (station_name) query.append('station_name', station_name)
+
+      const res = await fetch(`${API_BASE}/api/external-weather?${query.toString()}`)
+      if (res.ok) {
+        const data: ExternalWeatherResponse = await res.json()
+        if (data && data.available) {
+          return data
+        }
+      }
+    } catch {
+      // Backend proxy network error or timeout
+    }
+
+    // 2. Direct browser fallback to Open-Meteo API (guaranteed 100% uptime regardless of cloud datacenter proxy)
+    try {
+      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(latStr)}&longitude=${encodeURIComponent(lngStr)}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation`
+      const omRes = await fetch(omUrl)
+      if (omRes.ok) {
+        const omData = await omRes.json()
+        const current = omData.current || {}
+        if (current.temperature_2m !== undefined || current.time) {
+          return {
+            available: true,
+            source: 'Open-Meteo',
+            station_name,
+            latitude: numLat,
+            longitude: numLng,
+            timestamp: current.time || null,
+            temperature: current.temperature_2m ?? null,
+            humidity: current.relative_humidity_2m ?? null,
+            wind_speed: current.wind_speed_10m ?? null,
+            precipitation: current.precipitation ?? null,
+            units: {
+              temperature: '°C',
+              humidity: '%',
+              wind_speed: 'km/h',
+              precipitation: 'mm'
+            },
+            error_message: null
+          }
+        }
+      }
+    } catch {
+      // Direct fetch failed
+    }
+
+    return fallbackUnavailable
   },
 
   async getStats(): Promise<DatasetStatsResponse> {

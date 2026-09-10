@@ -371,8 +371,11 @@ def get_external_weather(
                 "longitude": round(longitude, 4),
                 "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
             },
-            headers={"User-Agent": "AtmosphericIntelligenceAWS-Reference/2.1"},
-            timeout=5
+            headers={
+                "User-Agent": "AWS-Anomaly-Detection/1.0 (telemetry-qc@aws-anomaly.org)",
+                "Accept": "application/json"
+            },
+            timeout=8
         )
 
         if response.status_code == 200:
