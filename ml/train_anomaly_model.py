@@ -48,7 +48,12 @@ def get_project_paths():
 
 def load_raw_dataset(data_dir: Path) -> pd.DataFrame:
     """Find and load the primary Excel/CSV weather dataset."""
-    excel_files = list(data_dir.glob("*.xlsx")) + list(data_dir.glob("*.xls"))
+    excel_files = (
+        list(data_dir.glob("*.xlsx"))
+        + list(data_dir.glob("*.xls"))
+        + list((data_dir / "raw").glob("*.xlsx"))
+        + list((data_dir / "raw").glob("*.xls"))
+    )
     if excel_files:
         target_file = max(excel_files, key=lambda f: f.stat().st_size)
         print(f"[+] Loading dataset: {target_file.name} ({target_file.stat().st_size / (1024*1024):.2f} MB)...")

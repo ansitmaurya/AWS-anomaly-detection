@@ -23,7 +23,12 @@ if sys.platform == "win32":
 
 def find_weather_dataset(data_dir: Path) -> Path:
     """Find the weather dataset Excel or CSV file inside data directory."""
-    excel_files = list(data_dir.glob("*.xlsx")) + list(data_dir.glob("*.xls"))
+    excel_files = (
+        list(data_dir.glob("*.xlsx"))
+        + list(data_dir.glob("*.xls"))
+        + list((data_dir / "raw").glob("*.xlsx"))
+        + list((data_dir / "raw").glob("*.xls"))
+    )
     if excel_files:
         return max(excel_files, key=lambda f: f.stat().st_size)
     
