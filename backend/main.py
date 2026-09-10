@@ -22,6 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Initialize ML Anomaly Detector with fallback
 try:
     from ml.predict_anomaly import WeatherAnomalyDetector
     detector = WeatherAnomalyDetector(PROJECT_ROOT / "ml" / "models")
@@ -37,25 +38,148 @@ app = FastAPI(
     version="2.1.0"
 )
 
-# Enable CORS for local Vite frontend
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "*"
-]
-
+# Robust CORS middleware supporting all origins with credentials for browser preflights
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Global dataset cache
+# Global dataset & analytical caches for sub-millisecond response times
 _cached_df: Optional[pd.DataFrame] = None
+_cached_anomalies_df: Optional[pd.DataFrame] = None
+_cached_station_summary_df: Optional[pd.DataFrame] = None
+_cached_stats: Optional[Dict[str, Any]] = None
+_cached_telemetry: Optional[Dict[str, Any]] = None
+
+
+def _init_dataset_caches(df: pd.DataFrame):
+    """Pre-compute aggregations in vectorised C-speed to eliminate request latency & 502 timeouts."""
+    global _cached_anomalies_df, _cached_station_summary_df, _cached_stats, _cached_telemetry
+    try:
+        total = len(df)
+        anomalies_count = int((df["anomaly"] == 1).sum())
+        normals_count = total - anomalies_count
+
+        # 1. Pre-filter anomaly subset
+        _cached_anomalies_df = df[df["anomaly"] == 1].copy()
+
+        # 2. Vectorized station aggregations (using fast C 'sum' and 'count')
+        station_agg = (
+            df.groupby(["station_name", "state", "district"])
+            .agg(
+                total_records=("anomaly", "count"),
+                anomalies=("anomaly", "sum"),
+                latitude=("latitude", "first"),
+                longitude=("longitude", "first"),
+                elevation=("elevation", "first"),
+                avg_temp=("avg_temp", "mean"),
+                latest_max_temp=("max_temp", "last"),
+                latest_min_temp=("min_temp", "last"),
+                latest_wind=("wind_speed", "last"),
+                latest_pressure=("air_pressure", "last"),
+                latest_rainfall=("rainfall", "last"),
+                latest_score=("anomaly_score", "last")
+            )
+            .reset_index()
+        )
+
+        station_agg["anomaly_rate"] = (station_agg["anomalies"] / station_agg["total_records"] * 100).round(2)
+        station_agg["health_score"] = station_agg["anomaly_rate"].apply(
+            lambda r: max(0.0, min(100.0, round(100.0 - (r * 2.5), 1)))
+        )
+
+        def get_status(rate: float) -> str:
+            if rate > 10.0:
+                return "Anomaly"
+            elif rate >= 2.0:
+                return "Suspicious"
+            else:
+                return "Normal"
+
+        station_agg["status"] = station_agg["anomaly_rate"].apply(get_status)
+        _cached_station_summary_df = station_agg.sort_values(by="anomalies", ascending=False)
+
+        stations_attention = int((station_agg["anomaly_rate"] > 5.0).sum())
+
+        # 3. Pre-computed dataset stats
+        _cached_stats = {
+            "total_records": total,
+            "normal_records": normals_count,
+            "anomaly_records": anomalies_count,
+            "anomaly_percentage": round((anomalies_count / total) * 100, 2) if total > 0 else 0.0,
+            "unique_stations": int(df["station_name"].nunique()),
+            "unique_states": int(df["state"].nunique()),
+            "unique_districts": int(df["district"].nunique()),
+            "stations_requiring_attention": stations_attention,
+            "available_states": sorted(df["state"].dropna().unique().tolist()),
+            "available_districts": sorted(df["district"].dropna().unique().tolist())[:100],
+            "date_range": {
+                "start": str(df["date_of_record"].min())[:10],
+                "end": str(df["date_of_record"].max())[:10]
+            },
+            "averages": {
+                "avg_temp": round(float(df["avg_temp"].mean()), 1),
+                "wind_speed": round(float(df["wind_speed"].dropna().mean()), 1),
+                "air_pressure": round(float(df["air_pressure"].dropna().mean()), 1),
+                "rainfall": round(float(df["rainfall"].dropna().mean()), 1)
+            }
+        }
+
+        # 4. Pre-computed telemetry analytics
+        seasonal_counts = df["season"].value_counts().to_dict()
+        seasonal_data = []
+        color_map = {
+            "Winter": "#38bdf8",
+            "Monsoon": "#10b981",
+            "Summer": "#f59e0b",
+            "Post-monsoon": "#a855f7"
+        }
+        for season_name, count in seasonal_counts.items():
+            pct = round((count / total) * 100, 1)
+            seasonal_data.append({
+                "name": f"{season_name} Telemetry",
+                "season": season_name,
+                "count": f"{count:,} Records",
+                "raw_count": count,
+                "pct": pct,
+                "color": color_map.get(season_name, "#64748b")
+            })
+
+        _cached_telemetry = {
+            "total_records": total,
+            "seasons": seasonal_data,
+            "ranges": {
+                "avg_temp": {
+                    "mean": round(float(df["avg_temp"].mean()), 1),
+                    "min": round(float(df["avg_temp"].min()), 1),
+                    "max": round(float(df["avg_temp"].max()), 1),
+                    "std": round(float(df["avg_temp"].std()), 1)
+                },
+                "wind_speed": {
+                    "mean": round(float(df["wind_speed"].dropna().mean()), 1),
+                    "min": round(float(df["wind_speed"].dropna().min()), 1),
+                    "max": round(float(df["wind_speed"].dropna().max()), 1),
+                    "std": round(float(df["wind_speed"].dropna().std()), 1)
+                },
+                "air_pressure": {
+                    "mean": round(float(df["air_pressure"].dropna().mean()), 1),
+                    "min": round(float(df["air_pressure"].dropna().min()), 1),
+                    "max": round(float(df["air_pressure"].dropna().max()), 1),
+                    "std": round(float(df["air_pressure"].dropna().std()), 1)
+                },
+                "rainfall": {
+                    "mean": round(float(df["rainfall"].dropna().mean()), 1),
+                    "min": round(float(df["rainfall"].dropna().min()), 1),
+                    "max": round(float(df["rainfall"].dropna().max()), 1),
+                    "std": round(float(df["rainfall"].dropna().std()), 1)
+                }
+            }
+        }
+    except Exception as e:
+        print(f"[Warning] Failed to precompute dataset caches: {e}")
 
 
 def get_dataset() -> Optional[pd.DataFrame]:
@@ -64,18 +188,32 @@ def get_dataset() -> Optional[pd.DataFrame]:
     if _cached_df is not None:
         return _cached_df
     
-    csv_path = PROJECT_ROOT / "data" / "processed" / "aws_anomaly_predictions.csv"
-    if csv_path.exists():
-        _cached_df = pd.read_csv(
-            csv_path,
-            usecols=[
-                "date_of_record", "season", "station_name", "state", "district",
-                "avg_temp", "min_temp", "max_temp", "wind_speed",
-                "air_pressure", "rainfall", "elevation", "latitude", "longitude",
-                "anomaly", "anomaly_score"
-            ]
-        )
-    return _cached_df
+    potential_paths = [
+        PROJECT_ROOT / "data" / "processed" / "aws_anomaly_predictions.csv",
+        PROJECT_ROOT / "aws_anomaly_predictions.csv",
+        PROJECT_ROOT / "data" / "aws_anomaly_predictions.csv",
+        Path("data/processed/aws_anomaly_predictions.csv").resolve(),
+        Path("data/aws_anomaly_predictions.csv").resolve()
+    ]
+    
+    for csv_path in potential_paths:
+        if csv_path.exists():
+            try:
+                _cached_df = pd.read_csv(
+                    csv_path,
+                    usecols=[
+                        "date_of_record", "season", "station_name", "state", "district",
+                        "avg_temp", "min_temp", "max_temp", "wind_speed",
+                        "air_pressure", "rainfall", "elevation", "latitude", "longitude",
+                        "anomaly", "anomaly_score"
+                    ]
+                )
+                _init_dataset_caches(_cached_df)
+                return _cached_df
+            except Exception as e:
+                print(f"[Warning] Could not load CSV dataset from {csv_path}: {e}")
+                
+    return None
 
 
 def classify_severity(score: float, row: Optional[Dict[str, Any]] = None) -> str:
@@ -234,7 +372,7 @@ def get_external_weather(
                 "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
             },
             headers={"User-Agent": "AtmosphericIntelligenceAWS-Reference/2.1"},
-            timeout=6
+            timeout=5
         )
 
         if response.status_code == 200:
@@ -270,22 +408,6 @@ def get_external_weather(
                 station_name=station_name,
                 error_message="External weather reference unavailable"
             )
-    except requests.Timeout:
-        return ExternalWeatherResponse(
-            available=False,
-            latitude=latitude,
-            longitude=longitude,
-            station_name=station_name,
-            error_message="External weather reference unavailable (request timed out)"
-        )
-    except requests.RequestException:
-        return ExternalWeatherResponse(
-            available=False,
-            latitude=latitude,
-            longitude=longitude,
-            station_name=station_name,
-            error_message="External weather reference unavailable"
-        )
     except Exception:
         return ExternalWeatherResponse(
             available=False,
@@ -430,17 +552,24 @@ def predict_anomaly(record: WeatherRecordInput):
 @app.get("/api/stats")
 def get_dataset_stats():
     """Return real aggregated statistical summary from the analyzed dataset."""
+    global _cached_stats
+    if _cached_stats is not None:
+        return _cached_stats
+        
     df = get_dataset()
     if df is None:
         raise HTTPException(status_code=404, detail="Processed anomaly dataset not found. Please train model first.")
     
+    if _cached_stats is not None:
+        return _cached_stats
+
     total = len(df)
     anomalies = int((df["anomaly"] == 1).sum())
     normals = total - anomalies
     
-    st_agg = df.groupby("station_name").agg(
+    st_agg = df.groupby("station_name", as_index=False).agg(
         total_records=("anomaly", "count"),
-        anomalies=("anomaly", lambda x: int((x == 1).sum()))
+        anomalies=("anomaly", "sum")
     )
     st_agg["anomaly_rate"] = st_agg["anomalies"] / st_agg["total_records"] * 100
     stations_attention = int((st_agg["anomaly_rate"] > 5.0).sum())
@@ -449,7 +578,7 @@ def get_dataset_stats():
         "total_records": total,
         "normal_records": normals,
         "anomaly_records": anomalies,
-        "anomaly_percentage": round((anomalies / total) * 100, 2),
+        "anomaly_percentage": round((anomalies / total) * 100, 2) if total > 0 else 0.0,
         "unique_stations": int(df["station_name"].nunique()),
         "unique_states": int(df["state"].nunique()),
         "unique_districts": int(df["district"].nunique()),
@@ -482,68 +611,36 @@ def get_stations(
     Get all active weather stations with exact dataset coordinates,
     health scores, and latest readings for map and directory visualization.
     """
-    df = get_dataset()
-    if df is None:
+    global _cached_station_summary_df
+    if _cached_station_summary_df is None:
+        df = get_dataset()
+        if df is None:
+            raise HTTPException(status_code=404, detail="Dataset not found.")
+            
+    station_summary = _cached_station_summary_df
+    if station_summary is None:
         raise HTTPException(status_code=404, detail="Dataset not found.")
     
-    station_summary = (
-        df.groupby(["station_name", "state", "district"])
-        .agg(
-            total_records=("anomaly", "count"),
-            anomalies=("anomaly", lambda x: int((x == 1).sum())),
-            latitude=("latitude", "first"),
-            longitude=("longitude", "first"),
-            elevation=("elevation", "first"),
-            avg_temp=("avg_temp", "mean"),
-            latest_max_temp=("max_temp", "last"),
-            latest_min_temp=("min_temp", "last"),
-            latest_wind=("wind_speed", "last"),
-            latest_pressure=("air_pressure", "last"),
-            latest_rainfall=("rainfall", "last"),
-            latest_score=("anomaly_score", "last")
-        )
-        .reset_index()
-    )
-    
-    station_summary["anomaly_rate"] = (station_summary["anomalies"] / station_summary["total_records"] * 100).round(2)
-    
-    # Station Health Score formula:
-    # Health = max(0, min(100, 100 - (anomaly_rate * 2.5)))
-    station_summary["health_score"] = station_summary["anomaly_rate"].apply(
-        lambda r: max(0.0, min(100.0, round(100.0 - (r * 2.5), 1)))
-    )
-    
-    def get_status(rate: float) -> str:
-        if rate > 10.0:
-            return "Anomaly"
-        elif rate >= 2.0:
-            return "Suspicious"
-        else:
-            return "Normal"
-            
-    station_summary["status"] = station_summary["anomaly_rate"].apply(get_status)
-    
-    # Filters
+    # Filters applied on pre-calculated ~400 rows in <1ms
+    filtered = station_summary
     if state and state.strip():
-        station_summary = station_summary[station_summary["state"].str.upper() == state.strip().upper()]
+        filtered = filtered[filtered["state"].str.upper() == state.strip().upper()]
     if district and district.strip():
-        station_summary = station_summary[station_summary["district"].str.lower() == district.strip().lower()]
+        filtered = filtered[filtered["district"].str.lower() == district.strip().lower()]
     if status and status.strip() and status != "ALL":
-        station_summary = station_summary[station_summary["status"].str.upper() == status.strip().upper()]
+        filtered = filtered[filtered["status"].str.upper() == status.strip().upper()]
     if search and search.strip():
         q = search.strip().lower()
-        station_summary = station_summary[
-            station_summary["station_name"].str.lower().str.contains(q, na=False) |
-            station_summary["district"].str.lower().str.contains(q, na=False) |
-            station_summary["state"].str.lower().str.contains(q, na=False)
+        filtered = filtered[
+            filtered["station_name"].str.lower().str.contains(q, na=False) |
+            filtered["district"].str.lower().str.contains(q, na=False) |
+            filtered["state"].str.lower().str.contains(q, na=False)
         ]
         
-    station_summary = station_summary.sort_values(by="anomalies", ascending=False)
-    total_stations = len(station_summary)
-    
+    total_stations = len(filtered)
     start_idx = (page - 1) * limit
     end_idx = start_idx + limit
-    items = station_summary.iloc[start_idx:end_idx].fillna("N/A").round(2).to_dict(orient="records")
+    items = filtered.iloc[start_idx:end_idx].fillna("N/A").round(2).to_dict(orient="records")
     
     return {
         "total": total_stations,
@@ -569,7 +666,6 @@ def get_timeseries_telemetry(
     if df is None:
         raise HTTPException(status_code=404, detail="Dataset not found.")
     
-    filtered = df
     matched_station = "Srinagar"
     if station and station.strip():
         q = station.strip().lower()
@@ -624,11 +720,13 @@ def get_anomalies(
     Browse and filter detected weather station anomalies from the processed dataset.
     Includes ML explanations and rule-based severity categorization.
     """
-    df = get_dataset()
-    if df is None:
-        raise HTTPException(status_code=404, detail="Processed anomaly dataset not found.")
-    
-    filtered = df[df["anomaly"] == 1]
+    global _cached_anomalies_df
+    if _cached_anomalies_df is None:
+        df = get_dataset()
+        if df is None:
+            raise HTTPException(status_code=404, detail="Processed anomaly dataset not found.")
+            
+    filtered = _cached_anomalies_df if _cached_anomalies_df is not None else get_dataset()[get_dataset()["anomaly"] == 1]
     
     if state and state.strip():
         filtered = filtered[filtered["state"].str.upper() == state.strip().upper()]
@@ -687,63 +785,19 @@ def get_anomalies(
 @app.get("/api/telemetry")
 def get_telemetry_analytics():
     """Return real computed telemetry distributions and seasonal breakdown."""
+    global _cached_telemetry
+    if _cached_telemetry is not None:
+        return _cached_telemetry
+        
     df = get_dataset()
     if df is None:
         raise HTTPException(status_code=404, detail="Processed dataset not found.")
-    
-    total_records = len(df)
-    
-    seasonal_counts = df["season"].value_counts().to_dict()
-    seasonal_data = []
-    color_map = {
-        "Winter": "#38bdf8",
-        "Monsoon": "#10b981",
-        "Summer": "#f59e0b",
-        "Post-monsoon": "#a855f7"
-    }
-    for season_name, count in seasonal_counts.items():
-        pct = round((count / total_records) * 100, 1)
-        seasonal_data.append({
-            "name": f"{season_name} Telemetry",
-            "season": season_name,
-            "count": f"{count:,} Records",
-            "raw_count": count,
-            "pct": pct,
-            "color": color_map.get(season_name, "#64748b")
-        })
         
-    ranges = {
-        "avg_temp": {
-            "mean": round(float(df["avg_temp"].mean()), 1),
-            "min": round(float(df["avg_temp"].min()), 1),
-            "max": round(float(df["avg_temp"].max()), 1),
-            "std": round(float(df["avg_temp"].std()), 1)
-        },
-        "wind_speed": {
-            "mean": round(float(df["wind_speed"].dropna().mean()), 1),
-            "min": round(float(df["wind_speed"].dropna().min()), 1),
-            "max": round(float(df["wind_speed"].dropna().max()), 1),
-            "std": round(float(df["wind_speed"].dropna().std()), 1)
-        },
-        "air_pressure": {
-            "mean": round(float(df["air_pressure"].dropna().mean()), 1),
-            "min": round(float(df["air_pressure"].dropna().min()), 1),
-            "max": round(float(df["air_pressure"].dropna().max()), 1),
-            "std": round(float(df["air_pressure"].dropna().std()), 1)
-        },
-        "rainfall": {
-            "mean": round(float(df["rainfall"].dropna().mean()), 1),
-            "min": round(float(df["rainfall"].dropna().min()), 1),
-            "max": round(float(df["rainfall"].dropna().max()), 1),
-            "std": round(float(df["rainfall"].dropna().std()), 1)
-        }
-    }
-    
-    return {
-        "total_records": total_records,
-        "seasons": seasonal_data,
-        "ranges": ranges
-    }
+    if _cached_telemetry is not None:
+        return _cached_telemetry
+        
+    _init_dataset_caches(df)
+    return _cached_telemetry
 
 
 if __name__ == "__main__":
