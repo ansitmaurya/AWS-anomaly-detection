@@ -1,16 +1,24 @@
-# Environment & Config
+# ==============================================================================
+# Unified .gitignore for AWS-anomaly-detection (Fullstack: FastAPI + React/Vite + ML)
+# Optimized for GitHub repository management and smooth Render / Cloud Deployment
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Environment Variables & Secrets
+# ------------------------------------------------------------------------------
 .env
+.env.*
+!.env.example
+!.env.template
+*.env
 .env.local
-.env.*.local
-*.log
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Node.js
-node_modules/
-dist/
-dist-ssr/
-*.local
-
-# Python
+# ------------------------------------------------------------------------------
+# 2. Python & Backend (FastAPI / ML scripts)
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,6 +28,10 @@ env/
 venv/
 .venv/
 ENV/
+env.bak/
+venv.bak/
+
+# Distribution / Packaging
 build/
 develop-eggs/
 dist/
@@ -32,26 +44,93 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Data & Models (Large binary/CSV datasets)
-data/raw/*.csv
-data/processed/*.csv
+# Pytest / Coverage / Jupyter
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# ------------------------------------------------------------------------------
+# 3. Node.js & Frontend (React / Vite)
+# ------------------------------------------------------------------------------
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist-ssr/
+*.local
+.npm/
+.eslintcache
+.stylelintcache
+
+# ------------------------------------------------------------------------------
+# 4. Logs & Debugging
+# ------------------------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------------------------------------------
+# 5. Data & Datasets (Prevent uploading heavy raw files & binary dumps)
+# ------------------------------------------------------------------------------
 *.csv
-*.xlsx
-*.xls
+*.tsv
 *.parquet
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-*.pkl
-*.joblib
-*.h5
-*.onnx
 
-# IDE & OS
-.vscode/
+# Explicit Data folder rules
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+!data/README.md
+
+# ------------------------------------------------------------------------------
+# 6. Machine Learning Models & Large Artifacts
+# ------------------------------------------------------------------------------
+*.pkl
+*.h5
+*.hdf5
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Keep ML directory structure intact
+!ml/models/.gitkeep
+!ml/src/.gitkeep
+!ml/README.md
+
+# ------------------------------------------------------------------------------
+# 7. IDE, Editors & OS Files
+# ------------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
+*.sublime-project
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS metadata
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+[Dd]esktop.ini

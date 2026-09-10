@@ -1,7 +1,0 @@
-*.csv
-*.tsv
-*.parquet
-*.json
-!README.md
-!raw/.gitkeep
-!processed/.gitkeep
