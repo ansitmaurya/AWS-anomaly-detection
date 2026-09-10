@@ -2,7 +2,8 @@
  * Centralized Typed API Client for AWS Anomaly Detection System Backend
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+const rawBaseUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://aws-anomaly-detection.onrender.com'
+const API_BASE = rawBaseUrl.replace(/\/+$/, '')
 
 export interface HealthResponse {
   status: string
