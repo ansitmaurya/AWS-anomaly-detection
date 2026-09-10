@@ -175,7 +175,9 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
         CRITICAL: { bg: 'rgba(220, 38, 38, 0.22)', border: 'rgba(220, 38, 38, 0.55)', text: '#f87171', label: 'CRITICAL SENSOR ALERT' }
       }[tier]
 
-      const anomalyScoreVal = st.latest_score ?? (st.anomaly_rate / 100).toFixed(2)
+      const anomalyScoreVal = st.latest_score != null 
+        ? Number(st.latest_score).toFixed(2) 
+        : (Number(st.anomaly_rate) / 100).toFixed(2)
 
       // Dark Mission Control Telemetry Popup
       const popupHtml = `
@@ -197,29 +199,29 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
             </div>
             <div class="met-popup-metric">
               <span class="lbl">QUALITY INDEX</span>
-              <span class="val" style="color: ${st.health_score > 80 ? '#34d399' : st.health_score > 60 ? '#fbbf24' : '#fb7185'};">${st.health_score}%</span>
+              <span class="val" style="color: ${st.health_score > 80 ? '#34d399' : st.health_score > 60 ? '#fbbf24' : '#fb7185'};">${st.health_score != null && !isNaN(Number(st.health_score)) ? Number(st.health_score).toFixed(2) : st.health_score}%</span>
             </div>
             <div class="met-popup-metric">
               <span class="lbl">AVG TEMPERATURE</span>
-              <span class="val">${st.avg_temp}°C</span>
+              <span class="val">${st.avg_temp != null && !isNaN(Number(st.avg_temp)) ? Number(st.avg_temp).toFixed(2) : 'N/A'}°C</span>
             </div>
             <div class="met-popup-metric">
               <span class="lbl">WIND SPEED</span>
-              <span class="val">${st.latest_wind ?? '9.4'} km/h</span>
+              <span class="val">${st.latest_wind != null && !isNaN(Number(st.latest_wind)) ? Number(st.latest_wind).toFixed(2) : '9.40'} km/h</span>
             </div>
             <div class="met-popup-metric">
               <span class="lbl">AIR PRESSURE</span>
-              <span class="val">${st.latest_pressure ?? '1009'} hPa</span>
+              <span class="val">${st.latest_pressure != null && !isNaN(Number(st.latest_pressure)) ? Number(st.latest_pressure).toFixed(2) : '1009.00'} hPa</span>
             </div>
             <div class="met-popup-metric">
               <span class="lbl">PRECIPITATION</span>
-              <span class="val">${st.latest_rainfall ?? '0.0'} mm</span>
+              <span class="val">${st.latest_rainfall != null && !isNaN(Number(st.latest_rainfall)) ? Number(st.latest_rainfall).toFixed(2) : '0.00'} mm</span>
             </div>
           </div>
 
           <div class="met-popup-footer">
             <span>OBS: ${st.total_records.toLocaleString()}</span>
-            <span>ANOMALIES: ${st.anomalies} (${st.anomaly_rate}%)</span>
+            <span>ANOMALIES: ${st.anomalies} (${st.anomaly_rate != null && !isNaN(Number(st.anomaly_rate)) ? Number(st.anomaly_rate).toFixed(2) : '0.00'}%)</span>
           </div>
         </div>
       `

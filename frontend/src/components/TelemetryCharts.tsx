@@ -200,7 +200,7 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
             {/* Gridlines */}
             {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
               const y = padding.top + plotHeight * pct
-              const val = (maxVal - pct * valRange).toFixed(1)
+              const val = (maxVal - pct * valRange).toFixed(2)
               return (
                 <g key={i}>
                   <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1.2" />
@@ -269,10 +269,10 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
                 📅 {hoveredPoint.date_of_record} • 📍 {hoveredPoint.station_name}
               </div>
               <div style={{ color: currentTheme.stroke, fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '0.86rem', marginTop: '0.15rem' }}>
-                {currentTheme.label}: <strong>{getMetricValue(hoveredPoint)}</strong>
+                {currentTheme.label}: <strong>{getMetricValue(hoveredPoint) != null && !isNaN(Number(getMetricValue(hoveredPoint))) ? Number(getMetricValue(hoveredPoint)).toFixed(2) : 'N/A'}</strong>
               </div>
               <div className="font-mono" style={{ fontSize: '0.72rem', color: '#475569', marginTop: '0.15rem' }}>
-                Temp: {hoveredPoint.min_temp}° / {hoveredPoint.max_temp}°C | Wind: {hoveredPoint.wind_speed} km/h | Press: {hoveredPoint.air_pressure} hPa | Rain: {hoveredPoint.rainfall} mm
+                Temp: {hoveredPoint.min_temp != null && !isNaN(Number(hoveredPoint.min_temp)) ? Number(hoveredPoint.min_temp).toFixed(2) : 'N/A'}° / {hoveredPoint.max_temp != null && !isNaN(Number(hoveredPoint.max_temp)) ? Number(hoveredPoint.max_temp).toFixed(2) : 'N/A'}°C | Wind: {hoveredPoint.wind_speed != null && !isNaN(Number(hoveredPoint.wind_speed)) ? Number(hoveredPoint.wind_speed).toFixed(2) : 'N/A'} km/h | Press: {hoveredPoint.air_pressure != null && !isNaN(Number(hoveredPoint.air_pressure)) ? Number(hoveredPoint.air_pressure).toFixed(2) : 'N/A'} hPa | Rain: {hoveredPoint.rainfall != null && !isNaN(Number(hoveredPoint.rainfall)) ? Number(hoveredPoint.rainfall).toFixed(2) : 'N/A'} mm
               </div>
               {hoveredPoint.anomaly === 1 ? (
                 <div style={{
@@ -288,7 +288,7 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
                   marginTop: '0.35rem',
                   fontSize: '0.7rem'
                 }}>
-                  ⚠️ ML-Detected Anomaly (Score: {hoveredPoint.anomaly_score})
+                  ⚠️ ML-Detected Anomaly (Score: {hoveredPoint.anomaly_score != null && !isNaN(Number(hoveredPoint.anomaly_score)) ? Number(hoveredPoint.anomaly_score).toFixed(2) : 'N/A'})
                 </div>
               ) : (
                 <div style={{

@@ -983,15 +983,15 @@ export function App() {
                       <div style={{ fontSize: '0.82rem', color: '#334155', marginTop: '0.2rem' }}>
                         {selectedMapStation && (!selectedMapDistanceKm || selectedMapDistanceKm === 0) ? (
                           <span>
-                            📍 <strong style={{ color: '#0f172a' }}>{selectedMapStation.station_name}</strong> ({selectedMapStation.district}, {selectedMapStation.state}) • Lat: {selectedMapStation.latitude}°N, Lon: {selectedMapStation.longitude}°E • Elev: {selectedMapStation.elevation}m
+                            📍 <strong style={{ color: '#0f172a' }}>{selectedMapStation.station_name}</strong> ({selectedMapStation.district}, {selectedMapStation.state}) • Lat: {Number(selectedMapStation.latitude).toFixed(2)}°N, Lon: {Number(selectedMapStation.longitude).toFixed(2)}°E • Elev: {selectedMapStation.elevation}m
                           </span>
                         ) : selectedMapStation && selectedMapDistanceKm && selectedMapDistanceKm > 0 ? (
                           <span>
-                            📍 Selected Point: <strong style={{ color: '#0f172a' }}>{selectedMapCoord?.lat.toFixed(4)}°N, {selectedMapCoord?.lng.toFixed(4)}°E</strong> • Nearest Synoptic Station: <strong style={{ color: '#0f172a' }}>{selectedMapStation.station_name}</strong> (~{selectedMapDistanceKm} km away)
+                            📍 Selected Point: <strong style={{ color: '#0f172a' }}>{selectedMapCoord?.lat.toFixed(2)}°N, {selectedMapCoord?.lng.toFixed(2)}°E</strong> • Nearest Synoptic Station: <strong style={{ color: '#0f172a' }}>{selectedMapStation.station_name}</strong> (~{selectedMapDistanceKm} km away)
                           </span>
                         ) : selectedMapCoord ? (
                           <span>
-                            📍 Selected Coordinate: <strong style={{ color: '#0f172a' }}>{selectedMapCoord.lat.toFixed(4)}°N, {selectedMapCoord.lng.toFixed(4)}°E</strong>
+                            📍 Selected Coordinate: <strong style={{ color: '#0f172a' }}>{selectedMapCoord.lat.toFixed(2)}°N, {selectedMapCoord.lng.toFixed(2)}°E</strong>
                           </span>
                         ) : (
                           <span>Click anywhere on the map or select any station marker to fetch real-time ground truth weather.</span>
@@ -1069,7 +1069,7 @@ export function App() {
                           <span style={{ fontSize: '1.1rem' }}>🌡️</span>
                         </div>
                         <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
-                          {mapExtWeather.temperature != null ? `${mapExtWeather.temperature}°C` : 'N/A'}
+                          {mapExtWeather.temperature != null ? `${Number(mapExtWeather.temperature).toFixed(2)}°C` : 'N/A'}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>2-meter ambient air reading</div>
                       </div>
@@ -1090,7 +1090,7 @@ export function App() {
                           <span style={{ fontSize: '1.1rem' }}>💧</span>
                         </div>
                         <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#0284c7', fontFamily: 'var(--font-mono)' }}>
-                          {mapExtWeather.humidity != null ? `${mapExtWeather.humidity}%` : 'N/A'}
+                          {mapExtWeather.humidity != null ? `${Number(mapExtWeather.humidity).toFixed(2)}%` : 'N/A'}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#0369a1', fontWeight: 600 }}>Relative atmospheric moisture</div>
                       </div>
@@ -1111,7 +1111,7 @@ export function App() {
                           <span style={{ fontSize: '1.1rem' }}>💨</span>
                         </div>
                         <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#059669', fontFamily: 'var(--font-mono)' }}>
-                          {mapExtWeather.wind_speed != null ? `${mapExtWeather.wind_speed} km/h` : 'N/A'}
+                          {mapExtWeather.wind_speed != null ? `${Number(mapExtWeather.wind_speed).toFixed(2)} km/h` : 'N/A'}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 600 }}>10-meter anemometer speed</div>
                       </div>
@@ -1132,7 +1132,7 @@ export function App() {
                           <span style={{ fontSize: '1.1rem' }}>🌧️</span>
                         </div>
                         <div style={{ fontSize: '1.55rem', fontWeight: 800, color: '#7c3aed', fontFamily: 'var(--font-mono)' }}>
-                          {mapExtWeather.precipitation != null ? `${mapExtWeather.precipitation} mm` : '0.0 mm'}
+                          {mapExtWeather.precipitation != null ? `${Number(mapExtWeather.precipitation).toFixed(2)} mm` : '0.00 mm'}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#6d28d9', fontWeight: 600 }}>Current surface rainfall rate</div>
                       </div>
@@ -1190,12 +1190,12 @@ export function App() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 700 }}>
                               <span>Temperature</span>
                               <span style={{ fontFamily: 'var(--font-mono)', color: '#059669', fontWeight: 800 }}>
-                                Diff: {mapExtWeather.temperature != null ? `${(selectedMapStation.avg_temp - mapExtWeather.temperature) >= 0 ? '+' : ''}${(selectedMapStation.avg_temp - mapExtWeather.temperature).toFixed(1)}°C` : 'N/A'}
+                                Diff: {mapExtWeather.temperature != null ? `${(selectedMapStation.avg_temp - mapExtWeather.temperature) >= 0 ? '+' : ''}${(selectedMapStation.avg_temp - mapExtWeather.temperature).toFixed(2)}°C` : 'N/A'}
                               </span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{selectedMapStation.avg_temp}°C</strong></span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{mapExtWeather.temperature}°C</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{Number(selectedMapStation.avg_temp).toFixed(2)}°C</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{Number(mapExtWeather.temperature).toFixed(2)}°C</strong></span>
                             </div>
                           </div>
 
@@ -1204,12 +1204,12 @@ export function App() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 700 }}>
                               <span>Wind Velocity</span>
                               <span style={{ fontFamily: 'var(--font-mono)', color: '#059669', fontWeight: 800 }}>
-                                Diff: {mapExtWeather.wind_speed != null ? `${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed).toFixed(1)} km/h` : 'N/A'}
+                                Diff: {mapExtWeather.wind_speed != null ? `${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_wind || 9.4) - mapExtWeather.wind_speed).toFixed(2)} km/h` : 'N/A'}
                               </span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{selectedMapStation.latest_wind || '9.4'} km/h</strong></span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{mapExtWeather.wind_speed} km/h</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{Number(selectedMapStation.latest_wind || 9.4).toFixed(2)} km/h</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{Number(mapExtWeather.wind_speed).toFixed(2)} km/h</strong></span>
                             </div>
                           </div>
 
@@ -1218,12 +1218,12 @@ export function App() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '0.25rem', fontWeight: 700 }}>
                               <span>Precipitation</span>
                               <span style={{ fontFamily: 'var(--font-mono)', color: '#059669', fontWeight: 800 }}>
-                                Diff: {mapExtWeather.precipitation != null ? `${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation).toFixed(1)} mm` : 'N/A'}
+                                Diff: {mapExtWeather.precipitation != null ? `${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation) >= 0 ? '+' : ''}${(Number(selectedMapStation.latest_rainfall || 0) - mapExtWeather.precipitation).toFixed(2)} mm` : 'N/A'}
                               </span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{selectedMapStation.latest_rainfall || '0.0'} mm</strong></span>
-                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{mapExtWeather.precipitation} mm</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#334155' }}>AWS: <strong style={{ color: '#0f172a' }}>{Number(selectedMapStation.latest_rainfall || 0).toFixed(2)} mm</strong></span>
+                              <span style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>Ref: <strong style={{ color: '#0284c7' }}>{Number(mapExtWeather.precipitation).toFixed(2)} mm</strong></span>
                             </div>
                           </div>
 
@@ -1259,7 +1259,7 @@ export function App() {
                                   : 'Sensor telemetry closely correlates with external baseline'}
                               </span>
                               <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#475569', fontStyle: 'italic', fontWeight: 500 }}>
-                                (Station Anomaly Rate: {selectedMapStation.anomaly_rate}% • Quality Index: {selectedMapStation.health_score}%)
+                                (Station Anomaly Rate: {Number(selectedMapStation.anomaly_rate).toFixed(2)}% • Quality Index: {Number(selectedMapStation.health_score).toFixed(2)}%)
                               </span>
                             </div>
                           )
@@ -1301,13 +1301,13 @@ export function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
                   <span className="ops-badge badge-cyan">📍 {formData.station_name}</span>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    {formData.latitude}°N, {formData.longitude}°E • Elev: {formData.elevation}m
+                    {Number(formData.latitude).toFixed(2)}°N, {Number(formData.longitude).toFixed(2)}°E • Elev: {formData.elevation}m
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', margin: '0.5rem 0' }}>
                   <div className="hero-temp">
-                    {formData.avg_temp}
+                    {Number(formData.avg_temp).toFixed(2)}
                     <span className="hero-temp-deg">°C</span>
                   </div>
 
@@ -1317,9 +1317,9 @@ export function App() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  <span>Low: <strong style={{ color: 'var(--met-sky)' }}>{formData.min_temp}°C</strong></span>
-                  <span>High: <strong style={{ color: 'var(--met-rose)' }}>{formData.max_temp}°C</strong></span>
-                  <span>Diurnal Range: <strong>{(formData.max_temp - formData.min_temp).toFixed(1)}°C</strong></span>
+                  <span>Low: <strong style={{ color: 'var(--met-sky)' }}>{Number(formData.min_temp).toFixed(2)}°C</strong></span>
+                  <span>High: <strong style={{ color: 'var(--met-rose)' }}>{Number(formData.max_temp).toFixed(2)}°C</strong></span>
+                  <span>Diurnal Range: <strong>{(formData.max_temp - formData.min_temp).toFixed(2)}°C</strong></span>
                 </div>
               </div>
 
@@ -1334,7 +1334,7 @@ export function App() {
                       {predictResult.is_anomaly ? '⚠️ ML-DETECTED ANOMALY' : '✅ NORMAL OBSERVATION'}
                     </span>
                     <div className="font-mono" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-                      Isolation Score: <strong style={{ color: predictResult.is_anomaly ? 'var(--met-rose)' : 'var(--met-mint)' }}>{(predictResult.anomaly_score * 100).toFixed(1)}%</strong>
+                      Isolation Score: <strong style={{ color: predictResult.is_anomaly ? 'var(--met-rose)' : 'var(--met-mint)' }}>{(predictResult.anomaly_score * 100).toFixed(2)}%</strong>
                     </div>
                   </div>
                 ) : (
@@ -1348,7 +1348,7 @@ export function App() {
               <div className="white-mint-mini">
                 <div className="lbl">💧 Precipitation</div>
                 <div className="val" style={{ marginTop: '0.2rem' }}>
-                  {formData.rainfall} mm
+                  {Number(formData.rainfall).toFixed(2)} mm
                 </div>
                 <div className="sub" style={{ marginTop: '0.15rem' }}>24h Accumulation</div>
               </div>
@@ -1356,7 +1356,7 @@ export function App() {
               <div className="white-mint-mini">
                 <div className="lbl">💨 Wind Speed</div>
                 <div className="val" style={{ marginTop: '0.2rem' }}>
-                  {formData.wind_speed} km/h
+                  {Number(formData.wind_speed).toFixed(2)} km/h
                 </div>
                 <div className="sub" style={{ marginTop: '0.15rem' }}>Surface Velocity</div>
               </div>
@@ -1364,7 +1364,7 @@ export function App() {
               <div className="white-mint-mini">
                 <div className="lbl">⏱️ Barometer</div>
                 <div className="val" style={{ marginTop: '0.2rem' }}>
-                  {formData.air_pressure} hPa
+                  {Number(formData.air_pressure).toFixed(2)} hPa
                 </div>
                 <div className="sub" style={{ marginTop: '0.15rem' }}>Atmospheric Pressure</div>
               </div>
@@ -1380,7 +1380,7 @@ export function App() {
               <div className="white-mint-mini">
                 <div className="lbl">🧭 Coordinates</div>
                 <div className="val" style={{ fontSize: '0.96rem', marginTop: '0.35rem' }}>
-                  {formData.latitude}°, {formData.longitude}°
+                  {Number(formData.latitude).toFixed(2)}°, {Number(formData.longitude).toFixed(2)}°
                 </div>
                 <div className="sub" style={{ marginTop: '0.15rem' }}>AWS GPS Fix</div>
               </div>
@@ -1604,7 +1604,7 @@ export function App() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
                         <span style={{ fontSize: '0.78rem', color: '#334155', fontWeight: 700 }}>Anomaly Score</span>
                         <span className="font-mono" style={{ fontSize: '1.05rem', fontWeight: 800, color: '#047857' }}>
-                          {(predictResult.anomaly_score * 100).toFixed(1)}% ({predictResult.anomaly_score})
+                          {(predictResult.anomaly_score * 100).toFixed(2)}% ({Number(predictResult.anomaly_score).toFixed(2)})
                         </span>
                       </div>
 
@@ -1668,7 +1668,7 @@ export function App() {
               </div>
 
               <div className="font-mono" style={{ borderTop: '1px solid #cbd5e1', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#334155', fontWeight: 700 }}>
-                <span>Decision Value: {predictResult?.decision_value ?? 'N/A'}</span>
+                <span>Decision Value: {predictResult?.decision_value != null ? Number(predictResult.decision_value).toFixed(2) : 'N/A'}</span>
                 <span>Model: IsolationForest</span>
               </div>
             </div>
@@ -1685,7 +1685,7 @@ export function App() {
                     EXTERNAL WEATHER REFERENCE
                   </h3>
                   <div style={{ fontSize: '0.72rem', color: '#334155', fontWeight: 600 }}>
-                    Live ground truth reference for {formData.station_name} ({formData.latitude}°N, {formData.longitude}°E)
+                    Live ground truth reference for {formData.station_name} ({Number(formData.latitude).toFixed(2)}°N, {Number(formData.longitude).toFixed(2)}°E)
                   </div>
                 </div>
               </div>
@@ -1713,28 +1713,28 @@ export function App() {
                   <div className="white-mint-mini" style={{ padding: '0.65rem 0.85rem' }}>
                     <div className="lbl">Temperature</div>
                     <div className="val" style={{ fontSize: '1.15rem', marginTop: '0.15rem' }}>
-                      {simExtWeather.temperature != null ? `${simExtWeather.temperature} °C` : 'N/A'}
+                      {simExtWeather.temperature != null ? `${Number(simExtWeather.temperature).toFixed(2)} °C` : 'N/A'}
                     </div>
                   </div>
 
                   <div className="white-mint-mini" style={{ padding: '0.65rem 0.85rem' }}>
                     <div className="lbl">Humidity</div>
                     <div className="val" style={{ fontSize: '1.15rem', marginTop: '0.15rem' }}>
-                      {simExtWeather.humidity != null ? `${simExtWeather.humidity} %` : 'N/A'}
+                      {simExtWeather.humidity != null ? `${Number(simExtWeather.humidity).toFixed(2)} %` : 'N/A'}
                     </div>
                   </div>
 
                   <div className="white-mint-mini" style={{ padding: '0.65rem 0.85rem' }}>
                     <div className="lbl">Wind Speed</div>
                     <div className="val" style={{ fontSize: '1.15rem', marginTop: '0.15rem' }}>
-                      {simExtWeather.wind_speed != null ? `${simExtWeather.wind_speed} km/h` : 'N/A'}
+                      {simExtWeather.wind_speed != null ? `${Number(simExtWeather.wind_speed).toFixed(2)} km/h` : 'N/A'}
                     </div>
                   </div>
 
                   <div className="white-mint-mini" style={{ padding: '0.65rem 0.85rem' }}>
                     <div className="lbl">Precipitation</div>
                     <div className="val" style={{ fontSize: '1.15rem', marginTop: '0.15rem' }}>
-                      {simExtWeather.precipitation != null ? `${simExtWeather.precipitation} mm` : '0.0 mm'}
+                      {simExtWeather.precipitation != null ? `${Number(simExtWeather.precipitation).toFixed(2)} mm` : '0.00 mm'}
                     </div>
                   </div>
                 </div>
@@ -1750,11 +1750,11 @@ export function App() {
                     <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#475569', marginBottom: '0.2rem', fontWeight: 600 }}>
                         <span>Temperature</span>
-                        <span className="font-mono">Diff: {simExtWeather.temperature != null ? `${(formData.avg_temp - simExtWeather.temperature) >= 0 ? '+' : ''}${(formData.avg_temp - simExtWeather.temperature).toFixed(1)}°C` : 'N/A'}</span>
+                        <span className="font-mono">Diff: {simExtWeather.temperature != null ? `${(formData.avg_temp - simExtWeather.temperature) >= 0 ? '+' : ''}${(formData.avg_temp - simExtWeather.temperature).toFixed(2)}°C` : 'N/A'}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                        <span className="font-mono">AWS: <strong style={{ color: '#000000' }}>{formData.avg_temp}°C</strong></span>
-                        <span className="font-mono">Ref: <strong style={{ color: '#0284c7' }}>{simExtWeather.temperature}°C</strong></span>
+                        <span className="font-mono">AWS: <strong style={{ color: '#000000' }}>{Number(formData.avg_temp).toFixed(2)}°C</strong></span>
+                        <span className="font-mono">Ref: <strong style={{ color: '#0284c7' }}>{Number(simExtWeather.temperature).toFixed(2)}°C</strong></span>
                       </div>
                     </div>
 
@@ -1762,11 +1762,11 @@ export function App() {
                     <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#475569', marginBottom: '0.2rem', fontWeight: 600 }}>
                         <span>Wind Velocity</span>
-                        <span className="font-mono">Diff: {simExtWeather.wind_speed != null ? `${(formData.wind_speed - simExtWeather.wind_speed) >= 0 ? '+' : ''}${(formData.wind_speed - simExtWeather.wind_speed).toFixed(1)} km/h` : 'N/A'}</span>
+                        <span className="font-mono">Diff: {simExtWeather.wind_speed != null ? `${(formData.wind_speed - simExtWeather.wind_speed) >= 0 ? '+' : ''}${(formData.wind_speed - simExtWeather.wind_speed).toFixed(2)} km/h` : 'N/A'}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                        <span className="font-mono">AWS: <strong style={{ color: '#000000' }}>{formData.wind_speed} km/h</strong></span>
-                        <span className="font-mono">Ref: <strong style={{ color: '#0284c7' }}>{simExtWeather.wind_speed} km/h</strong></span>
+                        <span className="font-mono">AWS: <strong style={{ color: '#000000' }}>{Number(formData.wind_speed).toFixed(2)} km/h</strong></span>
+                        <span className="font-mono">Ref: <strong style={{ color: '#0284c7' }}>{Number(simExtWeather.wind_speed).toFixed(2)} km/h</strong></span>
                       </div>
                     </div>
 
@@ -1774,11 +1774,11 @@ export function App() {
                     <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#475569', marginBottom: '0.2rem', fontWeight: 600 }}>
                         <span>Precipitation</span>
-                        <span className="font-mono">Diff: {simExtWeather.precipitation != null ? `${(formData.rainfall - simExtWeather.precipitation) >= 0 ? '+' : ''}${(formData.rainfall - simExtWeather.precipitation).toFixed(1)} mm` : 'N/A'}</span>
+                        <span className="font-mono">Diff: {simExtWeather.precipitation != null ? `${(formData.rainfall - simExtWeather.precipitation) >= 0 ? '+' : ''}${(formData.rainfall - simExtWeather.precipitation).toFixed(2)} mm` : 'N/A'}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                        <span className="font-mono">AWS: <strong style={{ color: '#000000' }}>{formData.rainfall} mm</strong></span>
-                        <span className="font-mono">Ref: <strong style={{ color: '#0284c7' }}>{simExtWeather.precipitation} mm</strong></span>
+                        <span className="font-mono">AWS: <strong style={{ color: '#000000' }}>{Number(formData.rainfall).toFixed(2)} mm</strong></span>
+                        <span className="font-mono">Ref: <strong style={{ color: '#0284c7' }}>{Number(simExtWeather.precipitation).toFixed(2)} mm</strong></span>
                       </div>
                     </div>
                   </div>
@@ -2063,19 +2063,19 @@ export function App() {
                           </span>
                         </td>
                         <td className="font-mono" style={{ color: '#0f172a', fontWeight: 700 }}>
-                          {item.avg_temp}°C
+                          {Number(item.avg_temp).toFixed(2)}°C
                         </td>
                         <td className="font-mono" style={{ color: Number(item.max_temp) > 50 ? '#e11d48' : '#334155', fontWeight: Number(item.max_temp) > 50 ? 800 : 600 }}>
-                          {item.min_temp}° / {item.max_temp}°C
+                          {Number(item.min_temp).toFixed(2)}° / {Number(item.max_temp).toFixed(2)}°C
                         </td>
                         <td className="font-mono" style={{ color: '#0f172a', fontWeight: 600 }}>
-                          {item.wind_speed} km/h
+                          {Number(item.wind_speed).toFixed(2)} km/h
                         </td>
                         <td className="font-mono" style={{ color: '#0f172a', fontWeight: 600 }}>
-                          {item.air_pressure} hPa
+                          {Number(item.air_pressure).toFixed(2)} hPa
                         </td>
                         <td className="font-mono" style={{ color: Number(item.rainfall) > 200 ? '#0284c7' : '#0f172a', fontWeight: Number(item.rainfall) > 200 ? 800 : 600 }}>
-                          {item.rainfall} mm
+                          {Number(item.rainfall).toFixed(2)} mm
                         </td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -2092,7 +2092,7 @@ export function App() {
                               color: isHigh ? '#be123c' : isMed ? '#b45309' : '#047857',
                               border: `1px solid ${isHigh ? '#fca5a5' : isMed ? '#fcd34d' : '#a7f3d0'}`
                             }}>
-                              {item.severity} ({Number(item.anomaly_score).toFixed(4)})
+                              {item.severity} ({Number(item.anomaly_score).toFixed(2)})
                             </span>
                             <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>
                               Isolation Score
@@ -2185,40 +2185,40 @@ export function App() {
                   <div className="white-mint-mini">
                     <div className="lbl">Avg Surface Temp</div>
                     <div className="val" style={{ marginTop: '0.2rem' }}>
-                      {telemetry?.ranges.avg_temp.mean ?? 25.7}°C
+                      {telemetry?.ranges.avg_temp.mean != null ? Number(telemetry.ranges.avg_temp.mean).toFixed(2) : '25.70'}°C
                     </div>
                     <div className="sub font-mono" style={{ marginTop: '0.25rem' }}>
-                      Range: <strong style={{ color: '#000000' }}>{telemetry?.ranges.avg_temp.min ?? -10.4}°</strong> to <strong style={{ color: '#000000' }}>{telemetry?.ranges.avg_temp.max ?? 43.4}°C</strong>
+                      Range: <strong style={{ color: '#000000' }}>{telemetry?.ranges.avg_temp.min != null ? Number(telemetry.ranges.avg_temp.min).toFixed(2) : '-10.40'}°</strong> to <strong style={{ color: '#000000' }}>{telemetry?.ranges.avg_temp.max != null ? Number(telemetry.ranges.avg_temp.max).toFixed(2) : '43.40'}°C</strong>
                     </div>
                   </div>
 
                   <div className="white-mint-mini">
                     <div className="lbl">Avg Wind Velocity</div>
                     <div className="val" style={{ marginTop: '0.2rem' }}>
-                      {telemetry?.ranges.wind_speed.mean ?? 9.4} km/h
+                      {telemetry?.ranges.wind_speed.mean != null ? Number(telemetry.ranges.wind_speed.mean).toFixed(2) : '9.40'} km/h
                     </div>
                     <div className="sub font-mono" style={{ marginTop: '0.25rem' }}>
-                      Max: <strong style={{ color: '#000000' }}>{telemetry?.ranges.wind_speed.max ?? 66.6} km/h</strong>
+                      Max: <strong style={{ color: '#000000' }}>{telemetry?.ranges.wind_speed.max != null ? Number(telemetry.ranges.wind_speed.max).toFixed(2) : '66.60'} km/h</strong>
                     </div>
                   </div>
 
                   <div className="white-mint-mini">
                     <div className="lbl">Barometric Pressure</div>
                     <div className="val" style={{ marginTop: '0.2rem' }}>
-                      {telemetry?.ranges.air_pressure.mean ?? 1009.4} hPa
+                      {telemetry?.ranges.air_pressure.mean != null ? Number(telemetry.ranges.air_pressure.mean).toFixed(2) : '1009.40'} hPa
                     </div>
                     <div className="sub font-mono" style={{ marginTop: '0.25rem' }}>
-                      Range: <strong style={{ color: '#000000' }}>{telemetry?.ranges.air_pressure.min ?? 922.6}</strong> to <strong style={{ color: '#000000' }}>{telemetry?.ranges.air_pressure.max ?? 1036.5}</strong>
+                      Range: <strong style={{ color: '#000000' }}>{telemetry?.ranges.air_pressure.min != null ? Number(telemetry.ranges.air_pressure.min).toFixed(2) : '922.60'}</strong> to <strong style={{ color: '#000000' }}>{telemetry?.ranges.air_pressure.max != null ? Number(telemetry.ranges.air_pressure.max).toFixed(2) : '1036.50'}</strong>
                     </div>
                   </div>
 
                   <div className="white-mint-mini">
                     <div className="lbl">Daily Precipitation</div>
                     <div className="val" style={{ marginTop: '0.2rem' }}>
-                      {telemetry?.ranges.rainfall.mean ?? 5.3} mm
+                      {telemetry?.ranges.rainfall.mean != null ? Number(telemetry.ranges.rainfall.mean).toFixed(2) : '5.30'} mm
                     </div>
                     <div className="sub font-mono" style={{ marginTop: '0.25rem' }}>
-                      Max 24h: <strong style={{ color: '#000000' }}>{telemetry?.ranges.rainfall.max ?? 485.9} mm</strong>
+                      Max 24h: <strong style={{ color: '#000000' }}>{telemetry?.ranges.rainfall.max != null ? Number(telemetry.ranges.rainfall.max).toFixed(2) : '485.90'} mm</strong>
                     </div>
                   </div>
                 </div>
@@ -2240,7 +2240,7 @@ export function App() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', fontSize: '0.85rem' }}>
                         <span style={{ fontWeight: 800, color: '#000000' }}>{s.name}</span>
                         <span className="font-mono" style={{ color: '#15803d', fontWeight: 800 }}>
-                          {s.count.toLocaleString()} ({s.pct}%)
+                          {s.count.toLocaleString()} ({Number(s.pct).toFixed(2)}%)
                         </span>
                       </div>
                       <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
@@ -2348,14 +2348,14 @@ export function App() {
                       }}>
                         <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>Status: <strong style={{ color: '#000000', fontWeight: 800 }}>{healthStatus}</strong></span>
                         <strong className="font-mono" style={{ fontSize: '0.92rem', color: st.health_score > 80 ? '#15803d' : st.health_score > 60 ? '#b45309' : '#be123c', fontWeight: 800 }}>
-                          {st.health_score}% ({st.status})
+                          {Number(st.health_score).toFixed(2)}% ({st.status})
                         </strong>
                       </div>
 
                       <div className="font-mono st-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Obs: <strong style={{ color: '#000000', fontWeight: 800 }}>{st.total_records.toLocaleString()}</strong></span>
                         <span style={{ color: st.anomalies > 50 ? '#be123c' : '#b45309', fontWeight: 800 }}>
-                          Anomalies: {st.anomalies} ({st.anomaly_rate}%)
+                          Anomalies: {st.anomalies} ({Number(st.anomaly_rate).toFixed(2)}%)
                         </span>
                       </div>
                     </div>
