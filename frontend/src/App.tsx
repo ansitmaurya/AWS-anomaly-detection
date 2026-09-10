@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   apiClient,
   type HealthResponse,
@@ -87,13 +87,12 @@ export function App() {
     }, 650)
   }
 
-  // Fetch Health, Stats, Map Nodes & Preview Data on Mount
+  // Parallelized lightweight core telemetry & stations on mount
   useEffect(() => {
-    fetchHealthAndStats()
-    fetchAllStationsForMap()
-    fetchTelemetryData()
-    fetchAnomalies()
-    fetchStations()
+    Promise.allSettled([
+      fetchHealthAndStats(),
+      fetchAllStationsForMap()
+    ])
   }, [])
 
   const fetchHealthAndStats = async () => {
@@ -130,7 +129,7 @@ export function App() {
     return nearest ? { station: nearest, distanceKm: Math.round(minDistance) } : null
   }
 
-  const handleMapLocationSelect = (lat: number, lng: number, station?: StationItem, shouldScroll = true) => {
+  const handleMapLocationSelect = useCallback((lat: number, lng: number, station?: StationItem, shouldScroll = true) => {
     let effectiveStation = station || null
     let distanceKm: number | null = 0
 
@@ -199,7 +198,7 @@ export function App() {
       .finally(() => {
         setLoadingMapExtWeather(false)
       })
-  }
+  }, [allStations])
 
   const fetchAllStationsForMap = async () => {
     setLoadingAllStations(true)
@@ -207,9 +206,11 @@ export function App() {
       const res = await apiClient.getStations({ limit: 500 })
       const items = res.items || []
       setAllStations(items)
+      setStations(items.slice(0, 12))
+      setStationTotalPages(Math.ceil(items.length / 12) || 1)
       if (items.length > 0) {
         // Auto-select initial station on page load without jumping screen
-        const initialStation = items.find(s => s.station_name.includes('Pune') || s.station_name.includes('Delhi')) || items[0]
+        const initialStation = items.find(s => s.station_name.includes('Pune') || s.station_name.includes('Delhi') || s.station_name.includes('Poona')) || items[0]
         handleMapLocationSelect(Number(initialStation.latitude), Number(initialStation.longitude), initialStation, false)
       }
     } catch {
@@ -2165,8 +2166,8 @@ export function App() {
           
           {/* REAL TIME-SERIES CHARTS */}
           <TelemetryCharts
-            initialStation="Poona"
-            availableStations={['Poona', 'Srinagar', 'Gulmarg', 'Akola', 'Madurai', 'Mount Abu', 'Visakhapatnam', 'Udaipur', 'Agra', 'Shimla', 'Dharmsala', 'Mahabaleshwar', 'Cherrapunji']}
+            initialStation={selectedMapStation?.station_name || formData.station_name || 'Poona'}
+            availableStations={allStations.map(s => s.station_name)}
           />
 
           {/* DISTRIBUTIONS & SEASONAL BREAKDOWN */}

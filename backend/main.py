@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import time
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
@@ -11,6 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import pandas as pd
 import numpy as np
+
+# Reusable HTTP session for Open-Meteo external weather reference
+_om_session = requests.Session()
+_om_session.headers.update({
+    "User-Agent": "AWS-Anomaly-Detection/1.0 (telemetry-qc@aws-anomaly.org)",
+    "Accept": "application/json"
+})
 
 # In-memory cache for Open-Meteo external weather reference
 # Key: (round(lat, 2), round(lon, 2)) -> (cached_time, response_dict)
@@ -53,11 +61,14 @@ _cached_anomalies_df: Optional[pd.DataFrame] = None
 _cached_station_summary_df: Optional[pd.DataFrame] = None
 _cached_stats: Optional[Dict[str, Any]] = None
 _cached_telemetry: Optional[Dict[str, Any]] = None
+_station_timeseries_index: Dict[str, Tuple[str, pd.DataFrame]] = {}
+_district_to_station_map: Dict[str, str] = {}
 
 
 def _init_dataset_caches(df: pd.DataFrame):
     """Pre-compute aggregations in vectorised C-speed to eliminate request latency & 502 timeouts."""
     global _cached_anomalies_df, _cached_station_summary_df, _cached_stats, _cached_telemetry
+    global _station_timeseries_index, _district_to_station_map
     try:
         total = len(df)
         anomalies_count = int((df["anomaly"] == 1).sum())
@@ -178,8 +189,77 @@ def _init_dataset_caches(df: pd.DataFrame):
                 }
             }
         }
+
+        # 5. Pre-computed indexed station timeseries in C-speed
+        sorted_df = df.sort_values(["station_name", "date_of_record"])
+        cols_to_keep = [
+            "date_of_record", "station_name", "avg_temp", "min_temp", "max_temp",
+            "wind_speed", "air_pressure", "rainfall", "anomaly", "anomaly_score"
+        ]
+        station_index = {}
+        for station_name, group in sorted_df.groupby("station_name"):
+            st_lower = str(station_name).strip().lower()
+            station_index[st_lower] = (str(station_name), group[cols_to_keep])
+        _station_timeseries_index = station_index
+
+        district_map = {}
+        for _, row in df[["station_name", "district"]].drop_duplicates().iterrows():
+            d = str(row["district"]).strip().lower()
+            if d and d not in district_map:
+                district_map[d] = str(row["station_name"]).strip().lower()
+        _district_to_station_map = district_map
+
     except Exception as e:
         print(f"[Warning] Failed to precompute dataset caches: {e}")
+
+
+def match_station_timeseries(station_query: Optional[str]) -> Tuple[str, pd.DataFrame]:
+    """
+    Intelligent O(1) matching for station time series.
+    Handles exact names, noise tokens (AWS, AWS-104), district names, and substrings.
+    """
+    if not _station_timeseries_index:
+        return ("Srinagar", pd.DataFrame())
+
+    if not station_query or not station_query.strip():
+        if "srinagar" in _station_timeseries_index:
+            return _station_timeseries_index["srinagar"]
+        first_key = next(iter(_station_timeseries_index))
+        return _station_timeseries_index[first_key]
+
+    q_raw = station_query.strip().lower()
+    q_clean = re.sub(r'\b(aws|station)\b[-\w]*', '', q_raw).strip()
+    q_clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', q_clean).strip()
+
+    # 1. Exact match on raw query
+    if q_raw in _station_timeseries_index:
+        return _station_timeseries_index[q_raw]
+
+    # 2. Exact match on cleaned query
+    if q_clean and q_clean in _station_timeseries_index:
+        return _station_timeseries_index[q_clean]
+
+    # 3. District lookup
+    if q_clean in _district_to_station_map and _district_to_station_map[q_clean] in _station_timeseries_index:
+        return _station_timeseries_index[_district_to_station_map[q_clean]]
+
+    # 4. Substring / Prefix match in station names
+    for key, val in _station_timeseries_index.items():
+        if q_clean and (q_clean in key or key in q_clean):
+            return val
+
+    # 5. Token match
+    tokens = [t for t in q_clean.split() if len(t) > 2]
+    for token in tokens:
+        for key, val in _station_timeseries_index.items():
+            if token in key:
+                return val
+
+    # 6. Fallback
+    if "srinagar" in _station_timeseries_index:
+        return _station_timeseries_index["srinagar"]
+    first_key = next(iter(_station_timeseries_index))
+    return _station_timeseries_index[first_key]
 
 
 def get_dataset() -> Optional[pd.DataFrame]:
@@ -363,62 +443,56 @@ def get_external_weather(
         if now - cached_time < CACHE_TTL_SECONDS:
             return ExternalWeatherResponse(**cached_data)
 
-    try:
-        response = requests.get(
-            "https://api.open-meteo.com/v1/forecast",
-            params={
-                "latitude": round(latitude, 4),
-                "longitude": round(longitude, 4),
-                "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
-            },
-            headers={
-                "User-Agent": "AWS-Anomaly-Detection/1.0 (telemetry-qc@aws-anomaly.org)",
-                "Accept": "application/json"
-            },
-            timeout=8
-        )
+    params = {
+        "latitude": round(latitude, 4),
+        "longitude": round(longitude, 4),
+        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation"
+    }
 
-        if response.status_code == 200:
-            data = response.json()
-            current = data.get("current", {})
-            
-            resp_dict = {
-                "available": True,
-                "source": "Open-Meteo",
-                "station_name": station_name,
-                "latitude": latitude,
-                "longitude": longitude,
-                "timestamp": current.get("time"),
-                "temperature": current.get("temperature_2m"),
-                "humidity": current.get("relative_humidity_2m"),
-                "wind_speed": current.get("wind_speed_10m"),
-                "precipitation": current.get("precipitation"),
-                "units": {
-                    "temperature": "°C",
-                    "humidity": "%",
-                    "wind_speed": "km/h",
-                    "precipitation": "mm"
-                },
-                "error_message": None
-            }
-            _external_weather_cache[cache_key] = (now, resp_dict)
-            return ExternalWeatherResponse(**resp_dict)
-        else:
-            return ExternalWeatherResponse(
-                available=False,
-                latitude=latitude,
-                longitude=longitude,
-                station_name=station_name,
-                error_message="External weather reference unavailable"
+    for attempt in range(2):
+        try:
+            response = _om_session.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params=params,
+                timeout=5
             )
-    except Exception:
-        return ExternalWeatherResponse(
-            available=False,
-            latitude=latitude,
-            longitude=longitude,
-            station_name=station_name,
-            error_message="External weather reference unavailable"
-        )
+
+            if response.status_code == 200:
+                data = response.json()
+                current = data.get("current", {})
+                if current.get("temperature_2m") is not None or current.get("time"):
+                    resp_dict = {
+                        "available": True,
+                        "source": "Open-Meteo",
+                        "station_name": station_name,
+                        "latitude": latitude,
+                        "longitude": longitude,
+                        "timestamp": current.get("time"),
+                        "temperature": current.get("temperature_2m"),
+                        "humidity": current.get("relative_humidity_2m"),
+                        "wind_speed": current.get("wind_speed_10m"),
+                        "precipitation": current.get("precipitation"),
+                        "units": {
+                            "temperature": "°C",
+                            "humidity": "%",
+                            "wind_speed": "km/h",
+                            "precipitation": "mm"
+                        },
+                        "error_message": None
+                    }
+                    _external_weather_cache[cache_key] = (now, resp_dict)
+                    return ExternalWeatherResponse(**resp_dict)
+        except Exception:
+            if attempt == 0:
+                time.sleep(0.08)
+
+    return ExternalWeatherResponse(
+        available=False,
+        latitude=latitude,
+        longitude=longitude,
+        station_name=station_name,
+        error_message="External weather reference unavailable"
+    )
 
 
 @app.get("/api/health")
@@ -663,43 +737,33 @@ def get_timeseries_telemetry(
 ):
     """
     Return real daily time-series telemetry records for charts.
-    Filterable by station and date range.
+    Filterable by station and date range with sub-millisecond indexed lookup.
     """
     df = get_dataset()
     if df is None:
         raise HTTPException(status_code=404, detail="Dataset not found.")
-    
-    matched_station = "Srinagar"
-    if station and station.strip():
-        q = station.strip().lower()
-        match_df = df[df["station_name"].str.lower().str.contains(q, na=False) | df["district"].str.lower().str.contains(q, na=False)]
-        if not match_df.empty:
-            filtered = match_df
-            matched_station = match_df["station_name"].iloc[0]
-        else:
-            filtered = df[df["station_name"] == "Srinagar"]
-            matched_station = "Srinagar"
-    else:
-        filtered = df[df["station_name"] == "Srinagar"]
-        matched_station = "Srinagar"
-            
+
+    matched_station, st_df = match_station_timeseries(station)
+    if st_df is None or st_df.empty:
+        return {
+            "station": matched_station or "Station",
+            "total_points": 0,
+            "data": []
+        }
+
+    filtered = st_df
     if start_date:
         filtered = filtered[filtered["date_of_record"] >= start_date]
     if end_date:
         filtered = filtered[filtered["date_of_record"] <= end_date]
-        
-    filtered = filtered.sort_values(by="date_of_record", ascending=True)
+
     if len(filtered) > limit:
         filtered = filtered.tail(limit)
-        
-    records = filtered[[
-        "date_of_record", "station_name", "avg_temp", "min_temp", "max_temp",
-        "wind_speed", "air_pressure", "rainfall", "anomaly", "anomaly_score"
-    ]].fillna(0).to_dict(orient="records")
-    
+
+    records = filtered.fillna(0).to_dict(orient="records")
     for r in records:
         r["date_of_record"] = str(r["date_of_record"])[:10]
-        
+
     return {
         "station": matched_station,
         "total_points": len(records),
@@ -801,6 +865,15 @@ def get_telemetry_analytics():
         
     _init_dataset_caches(df)
     return _cached_telemetry
+
+
+@app.on_event("startup")
+def startup_warmup():
+    """Warm up dataset and pre-computed indexes on startup so initial API calls are sub-millisecond."""
+    try:
+        get_dataset()
+    except Exception as e:
+        print(f"[Warning] Startup warmup failed: {e}")
 
 
 if __name__ == "__main__":

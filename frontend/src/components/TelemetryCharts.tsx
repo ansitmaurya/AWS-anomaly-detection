@@ -12,22 +12,45 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
   const [loading, setLoading] = useState<boolean>(true)
   const [activeMetric, setActiveMetric] = useState<'temp' | 'rain' | 'wind' | 'pressure'>('temp')
   const [hoveredPoint, setHoveredPoint] = useState<TimeSeriesPoint | null>(null)
+  const [stationCache, setStationCache] = useState<Record<string, TimeSeriesPoint[]>>({})
+
+  // Sync station when initialStation prop updates from map/simulator
+  useEffect(() => {
+    if (initialStation && initialStation !== selectedStation) {
+      setSelectedStation(initialStation)
+    }
+  }, [initialStation])
 
   useEffect(() => {
     fetchStationTimeseries(selectedStation)
   }, [selectedStation])
 
   const fetchStationTimeseries = async (station: string) => {
+    if (stationCache[station] && stationCache[station].length > 0) {
+      setTimeseriesData(stationCache[station])
+      return
+    }
     setLoading(true)
     try {
       const res = await apiClient.getTimeSeries({ station, limit: 45 })
-      setTimeseriesData(res.data || [])
+      const pts = res.data || []
+      setTimeseriesData(pts)
+      if (pts.length > 0) {
+        setStationCache(prev => ({ ...prev, [station]: pts }))
+      }
     } catch {
       setTimeseriesData([])
     } finally {
       setLoading(false)
     }
   }
+
+  // Deduplicate and ensure selectedStation is always selectable
+  const stationOptions = Array.from(new Set([
+    selectedStation,
+    ...availableStations,
+    'Poona', 'Srinagar', 'Gulmarg', 'Akola', 'Madurai', 'Mount Abu', 'Visakhapatnam', 'Udaipur', 'Agra', 'Shimla', 'Dharmsala', 'Mahabaleshwar', 'Cherrapunji'
+  ])).filter(Boolean)
 
   // Calculate chart geometry
   const width = 800
@@ -121,21 +144,9 @@ export function TelemetryCharts({ initialStation = 'Poona', availableStations = 
             value={selectedStation}
             onChange={(e) => setSelectedStation(e.target.value)}
           >
-            {availableStations.length > 0 ? (
-              availableStations.map(s => <option key={s} value={s}>{s}</option>)
-            ) : (
-              <>
-                <option value="Poona">Poona AWS</option>
-                <option value="Srinagar">Srinagar AWS</option>
-                <option value="Thiruvananthapuram">Thiruvananthapuram AWS</option>
-                <option value="Akola">Akola AWS</option>
-                <option value="Madurai">Madurai AWS</option>
-                <option value="Agra">Agra AWS</option>
-                <option value="Gulmarg">Gulmarg AWS</option>
-                <option value="Mount Abu">Mount Abu AWS</option>
-                <option value="Siliguri">Siliguri AWS</option>
-              </>
-            )}
+            {stationOptions.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
 
           {/* Metric Buttons */}

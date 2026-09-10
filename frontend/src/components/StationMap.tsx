@@ -18,6 +18,12 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
   const selectionLayerRef = useRef<L.LayerGroup | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
 
+  const onMapClickRef = useRef(onMapClick)
+  onMapClickRef.current = onMapClick
+
+  const onSelectStationRef = useRef(onSelectStation)
+  onSelectStationRef.current = onSelectStation
+
   // Helper to categorize station severity tier
   const getStationTier = (st: StationItem) => {
     if (st.anomaly_rate > 30.0 || (st.latest_score && st.latest_score > 0.70)) {
@@ -31,9 +37,11 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
     }
   }
 
-  // Initialize Leaflet Map
+  // Initialize Leaflet Map (Once on mount)
   useEffect(() => {
     if (!mapContainerRef.current) return
+
+    let resizeObserver: ResizeObserver | null = null
 
     if (!mapInstanceRef.current) {
       // Light-Green Meteorological Terrain Map — Centered on India with smooth, controlled zoom
@@ -68,19 +76,35 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
         const lat = Number(e.latlng.lat.toFixed(4))
         const lng = Number(e.latlng.lng.toFixed(4))
         map.panTo([lat, lng], { animate: true, duration: 0.35 })
-        if (onMapClick) {
-          onMapClick(lat, lng, undefined)
+        if (onMapClickRef.current) {
+          onMapClickRef.current(lat, lng, undefined)
         }
       })
+
+      resizeObserver = new ResizeObserver(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize()
+        }
+      })
+      resizeObserver.observe(mapContainerRef.current)
+
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize()
+        }
+      }, 100)
     }
 
     return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
       }
     }
-  }, [onMapClick])
+  }, [])
 
   // Update Markers when stations or filter changes
   useEffect(() => {
@@ -95,7 +119,9 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
     })
 
     filtered.forEach(st => {
-      if (!st.latitude || !st.longitude || isNaN(Number(st.latitude)) || isNaN(Number(st.longitude))) return
+      const lat = typeof st.latitude === 'number' ? st.latitude : parseFloat(String(st.latitude))
+      const lng = typeof st.longitude === 'number' ? st.longitude : parseFloat(String(st.longitude))
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return
 
       const tier = getStationTier(st)
 
@@ -121,7 +147,7 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
 
       // Subtle pulse ring for Critical & Anomaly nodes
       if (tier === 'CRITICAL' || tier === 'ANOMALY') {
-        const pulseRing = L.circleMarker([Number(st.latitude), Number(st.longitude)], {
+        const pulseRing = L.circleMarker([lat, lng], {
           radius: markerRadius + 4,
           fillColor: 'transparent',
           color: markerColor,
@@ -132,7 +158,7 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
         pulseRing.addTo(markersLayerRef.current!)
       }
 
-      const marker = L.circleMarker([Number(st.latitude), Number(st.longitude)], {
+      const marker = L.circleMarker([lat, lng], {
         radius: markerRadius,
         fillColor: markerColor,
         color: strokeColor,
@@ -201,15 +227,21 @@ export function StationMap({ stations, loading, selectedCoord, onSelectStation, 
 
       marker.on('click', () => {
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.panTo([Number(st.latitude), Number(st.longitude)], { animate: true, duration: 0.5 })
+          mapInstanceRef.current.panTo([lat, lng], { animate: true, duration: 0.5 })
         }
-        if (onSelectStation) onSelectStation(st)
-        if (onMapClick) onMapClick(Number(st.latitude), Number(st.longitude), st)
+        if (onSelectStationRef.current) onSelectStationRef.current(st)
+        if (onMapClickRef.current) onMapClickRef.current(lat, lng, st)
       })
 
       marker.addTo(markersLayerRef.current!)
     })
-  }, [stations, statusFilter, onMapClick, onSelectStation])
+
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize()
+      }
+    }, 50)
+  }, [stations, statusFilter])
 
   // Update Selected Coordinate Reticle Marker
   useEffect(() => {

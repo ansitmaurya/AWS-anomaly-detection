@@ -184,11 +184,23 @@ export interface ExternalWeatherResponse {
   error_message?: string | null
 }
 
+const _weatherCache = new Map<string, { time: number; data: ExternalWeatherResponse }>()
+const WEATHER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+let _cachedStatsData: DatasetStatsResponse | null = null
+let _cachedTelemetryData: TelemetryAnalyticsResponse | null = null
+
 export const apiClient = {
   async getHealth(): Promise<HealthResponse> {
-    const res = await fetch(`${API_BASE}/api/health`)
-    if (!res.ok) throw new Error(`Health check failed: ${res.statusText}`)
-    return res.json()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 6000)
+    try {
+      const res = await fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+      if (!res.ok) throw new Error(`Health check failed: ${res.statusText}`)
+      return await res.json()
+    } finally {
+      clearTimeout(timeoutId)
+    }
   },
 
   async getExternalWeather(latitude: number | string, longitude: number | string, station_name?: string): Promise<ExternalWeatherResponse> {
@@ -211,53 +223,75 @@ export const apiClient = {
 
     const latStr = numLat.toFixed(4)
     const lngStr = numLng.toFixed(4)
+    const cacheKey = `${latStr}_${lngStr}`
 
-    // 1. Try fetching via Backend API proxy
+    // 0. Check in-memory client cache
+    const cached = _weatherCache.get(cacheKey)
+    if (cached && Date.now() - cached.time < WEATHER_CACHE_TTL) {
+      return { ...cached.data, station_name: station_name || cached.data.station_name }
+    }
+
+    // 1. Try fetching via Backend API proxy (Primary)
     try {
       const query = new URLSearchParams()
       query.append('latitude', latStr)
       query.append('longitude', lngStr)
       if (station_name) query.append('station_name', station_name)
 
-      const res = await fetch(`${API_BASE}/api/external-weather?${query.toString()}`)
-      if (res.ok) {
-        const data: ExternalWeatherResponse = await res.json()
-        if (data && data.available) {
-          return data
-        }
-      }
-    } catch {
-      // Backend proxy network error or timeout
-    }
-
-    // 2. Direct browser fallback to Open-Meteo API (guaranteed 100% uptime regardless of cloud datacenter proxy)
-    try {
-      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(latStr)}&longitude=${encodeURIComponent(lngStr)}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation`
-      const omRes = await fetch(omUrl)
-      if (omRes.ok) {
-        const omData = await omRes.json()
-        const current = omData.current || {}
-        if (current.temperature_2m !== undefined || current.time) {
-          return {
-            available: true,
-            source: 'Open-Meteo',
-            station_name,
-            latitude: numLat,
-            longitude: numLng,
-            timestamp: current.time || null,
-            temperature: current.temperature_2m ?? null,
-            humidity: current.relative_humidity_2m ?? null,
-            wind_speed: current.wind_speed_10m ?? null,
-            precipitation: current.precipitation ?? null,
-            units: {
-              temperature: '°C',
-              humidity: '%',
-              wind_speed: 'km/h',
-              precipitation: 'mm'
-            },
-            error_message: null
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      try {
+        const res = await fetch(`${API_BASE}/api/external-weather?${query.toString()}`, { signal: controller.signal })
+        if (res.ok) {
+          const data: ExternalWeatherResponse = await res.json()
+          if (data && data.available) {
+            _weatherCache.set(cacheKey, { time: Date.now(), data })
+            return data
           }
         }
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    } catch {
+      // Backend proxy timeout or network issue -> fallback to direct browser fetch
+    }
+
+    // 2. Direct browser fallback to Open-Meteo API
+    try {
+      const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(latStr)}&longitude=${encodeURIComponent(lngStr)}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation`
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      try {
+        const omRes = await fetch(omUrl, { signal: controller.signal })
+        if (omRes.ok) {
+          const omData = await omRes.json()
+          const current = omData.current || {}
+          if (current.temperature_2m !== undefined || current.time) {
+            const parsedData: ExternalWeatherResponse = {
+              available: true,
+              source: 'Open-Meteo',
+              station_name,
+              latitude: numLat,
+              longitude: numLng,
+              timestamp: current.time || null,
+              temperature: current.temperature_2m ?? null,
+              humidity: current.relative_humidity_2m ?? null,
+              wind_speed: current.wind_speed_10m ?? null,
+              precipitation: current.precipitation ?? null,
+              units: {
+                temperature: '°C',
+                humidity: '%',
+                wind_speed: 'km/h',
+                precipitation: 'mm'
+              },
+              error_message: null
+            }
+            _weatherCache.set(cacheKey, { time: Date.now(), data: parsedData })
+            return parsedData
+          }
+        }
+      } finally {
+        clearTimeout(timeoutId)
       }
     } catch {
       // Direct fetch failed
@@ -267,15 +301,21 @@ export const apiClient = {
   },
 
   async getStats(): Promise<DatasetStatsResponse> {
+    if (_cachedStatsData) return _cachedStatsData
     const res = await fetch(`${API_BASE}/api/stats`)
     if (!res.ok) throw new Error(`Stats fetch failed: ${res.statusText}`)
-    return res.json()
+    const data = await res.json()
+    _cachedStatsData = data
+    return data
   },
 
   async getTelemetry(): Promise<TelemetryAnalyticsResponse> {
+    if (_cachedTelemetryData) return _cachedTelemetryData
     const res = await fetch(`${API_BASE}/api/telemetry`)
     if (!res.ok) throw new Error(`Telemetry fetch failed: ${res.statusText}`)
-    return res.json()
+    const data = await res.json()
+    _cachedTelemetryData = data
+    return data
   },
 
   async getTimeSeries(params?: {
